@@ -1,4 +1,4 @@
-# Transcription — Parakeet Long-Form ASR
+# Transcription - Parakeet Long-Form ASR
 
 Transcribes audio files to text using NVIDIA's Parakeet ASR model (NeMo), with chunked processing for long-form audio and overlap-based deduplication.
 

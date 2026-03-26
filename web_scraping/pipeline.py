@@ -34,20 +34,23 @@ from .ytdlp_runner import download_source_to_wav
 
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
-    """
-    Configuration for pipeline behavior.
+    """Configuration for pipeline behavior.
 
-    Parameters
-    ----------
-    out_root : Path
-        Root directory for outputs, ex: "School Board Meetings"
-    cutoff : date
-        Only keep meetings with date >= cutoff (when date is known).
-    fragment_workers : int
-        Fragment concurrency for segmented streams
-    max_candidates : int
-        Maximum number of candidate links to attempt from HTML scraping
-        Lower = faster, higher = more thorough
+    Attributes:
+        out_root:                   Root directory for outputs,
+                                    e.g. ``"School Board Meetings"``.
+        cutoff:                     Only keep meetings with date >= cutoff
+                                    (when date is known).
+        fragment_workers:           Concurrency for HLS/DASH fragment downloads.
+        max_candidates:             Maximum candidate links to attempt from
+                                    HTML scraping.  Lower = faster, higher =
+                                    more thorough.
+        include_title_regex:        If set, only download entries whose title
+                                    matches this regex.
+        include_anchor_label_regex: If set, only follow anchor links whose
+                                    text matches this regex during scraping.
+        min_date:                   Earliest meeting date to accept.
+        ffmpeg_location:            Path to ffmpeg binary, if not on PATH.
     """
     out_root: Path
     cutoff: date

@@ -127,7 +127,7 @@ def main():
     reference = normalize_text(load_text(sys.argv[1]))
     hypothesis = normalize_text(load_text(sys.argv[2]))
 
-    # Process words (This returns a WordCleanReport in v4.0.0)
+    # Process words
     out = jiwer.process_words(reference, hypothesis)
     
     # Extract Error Counts from Alignment Chunks

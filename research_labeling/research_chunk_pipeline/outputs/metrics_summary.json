@@ -1,0 +1,60 @@
+{
+  "feature_mode": "query_conditioned",
+  "query_text": "How are research, data, reports, or studies used to make informed decisions?",
+  "best_c": 1.5,
+  "best_class_weight": "balanced",
+  "best_threshold": 0.3,
+  "feature_dimension": 1536,
+  "chunk_embedding_dimension": 768,
+  "query_embedding_dimension": 768,
+  "train_metrics": {
+    "threshold": 0.3,
+    "precision": 0.26558265582655827,
+    "recall": 1.0,
+    "f1": 0.4197002141327623,
+    "f2": 0.6438896189224704,
+    "average_precision": 0.7373470760875613,
+    "true_negative": 738,
+    "false_positive": 271,
+    "false_negative": 0,
+    "true_positive": 98,
+    "predicted_positive_count": 369,
+    "actual_positive_count": 98
+  },
+  "validation_metrics": {
+    "threshold": 0.3,
+    "precision": 0.30952380952380953,
+    "recall": 0.7878787878787878,
+    "f1": 0.4444444444444444,
+    "f2": 0.6018518518518519,
+    "average_precision": 0.38537401987084585,
+    "true_negative": 199,
+    "false_positive": 58,
+    "false_negative": 7,
+    "true_positive": 26,
+    "predicted_positive_count": 84,
+    "actual_positive_count": 33
+  },
+  "test_metrics": {
+    "threshold": 0.3,
+    "precision": 0.2727272727272727,
+    "recall": 0.9375,
+    "f1": 0.4225352112676056,
+    "f2": 0.6302521008403361,
+    "average_precision": 0.5922872497206286,
+    "true_negative": 207,
+    "false_positive": 80,
+    "false_negative": 2,
+    "true_positive": 30,
+    "predicted_positive_count": 110,
+    "actual_positive_count": 32
+  },
+  "dataset_summary": {
+    "n_total_chunks": 1716,
+    "n_total_positives": 163,
+    "n_transcripts": 25,
+    "train_transcripts": 15,
+    "val_transcripts": 5,
+    "test_transcripts": 5
+  }
+}

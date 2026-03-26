@@ -1,0 +1,21 @@
+# Web Scraping
+yt-dlp
+requests
+beautifulsoup4
+lxml
+tqdm
+
+# Transcription
+nemo_toolkit[asr]
+
+# Research Labeling
+sentence-transformers
+scikit-learn
+pandas
+numpy
+matplotlib
+
+# Word Error Rate
+jiwer
+contractions
+num2words

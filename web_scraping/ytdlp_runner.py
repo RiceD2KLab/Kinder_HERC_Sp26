@@ -129,6 +129,10 @@ def build_ydl_opts(
         Reduce console output.
     include_title_regex : Optional[str]
         If provided, yt-dlp will only download entries whose title matches this regex.
+    ffmpeg_location : Optional[Path]
+        Path to ffmpeg binary, if not on PATH.
+    status_cb : Optional[Callable]
+        Callback invoked with progress messages during download.
 
     Outputs
     -------
