@@ -17,27 +17,52 @@ import contractions
 from num2words import num2words
 
 def load_text(path):
-    """Reads the content of a file using UTF-8 encoding."""
+    """Read the full content of a text file.
+
+    Inputs
+    ------
+    path : str
+        File path to read.
+
+    Outputs
+    -------
+    str
+        The file's content as a single string.
+    """
     return Path(path).read_text(encoding="utf-8")
 
 def replace_numbers(text):
-    """
-    Finds digits in text and converts them to words.
+    """Convert all digit sequences in text to their word equivalents.
+
+    Inputs
+    ------
+    text : str
+        Input text potentially containing numbers.
+
+    Outputs
+    -------
+    str
+        Text with digits replaced by words (e.g. "50" -> "fifty").
     """
     return re.sub(r'\d+', lambda m: num2words(int(m.group(0))), text)
 
 def normalize_text(text):
-    """
-    Standardizes text to minimize 'false' errors during comparison.
-    
-    Processing steps:
-    1. Lowercase conversion.
-    2. Expand contractions.
-    3. Replace numbers to be written out.
-    4. Removal of bracketed timestamps and non-speech tags.
-    5. Removal of speaker change symbols (>>).
-    6. Normalization of 'am/pm' and time formats.
-    7. Stripping of filler words (uh, um, etc.) and punctuation.
+    """Standardize text to minimize false errors during WER comparison.
+
+    Applies lowercasing, contraction expansion, number-to-word conversion,
+    timestamp/tag removal, speaker indicator removal, time format normalization,
+    filler word removal, percent expansion, punctuation removal, and title
+    normalization.
+
+    Inputs
+    ------
+    text : str
+        Raw transcript text (reference or hypothesis).
+
+    Outputs
+    -------
+    str
+        Normalized text ready for WER comparison.
     """
     # lowercase
     text = text.lower()
@@ -76,7 +101,24 @@ def normalize_text(text):
 
 
 def main():
-    """Load reference and hypothesis files, normalize, compute WER, and print results."""
+    """Run the WER calculation pipeline from the command line.
+
+    Reads two file paths from sys.argv, normalizes both texts, computes
+    WER using jiwer, and prints summary metrics with top-10 error breakdowns.
+
+    Inputs
+    ------
+    sys.argv[1] : str
+        Path to the reference (ground truth) transcript file.
+    sys.argv[2] : str
+        Path to the hypothesis (ASR-generated) transcript file.
+
+    Outputs
+    -------
+    None
+        Results are printed to stdout: WER score, substitution/deletion/insertion
+        counts, and top-10 most frequent errors per category.
+    """
     if len(sys.argv) != 3:
         print("Usage: python wer_norm.py reference.txt hypothesis.txt")
         return
