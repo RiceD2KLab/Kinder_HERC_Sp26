@@ -7,13 +7,13 @@
 
 This repository contains an end-to-end pipeline for collecting, transcribing, and analyzing school board meeting recordings from Houston-area school districts. The project was developed for the Kinder Institute for Urban Research at Rice University (HERC) as part of COMP 449 / DATA 435 (Spring 2026).
 
-The goal is to identify segments of school board meetings where **research, data, reports, or studies are cited to inform policy decisions**. The pipeline consists of four standalone programs that are run sequentially:
+The goal is to identify segments of school board meetings where **research, data, reports, or studies are cited to inform policy decisions**. The pipeline consists of five standalone programs that are run sequentially:
 
 1. **Web Scraping** — Download meeting videos from district websites (Swagit).
 2. **Transcription** — Convert audio recordings to text using NVIDIA Parakeet ASR.
-3. **Transcript Chunking** — Split timestamped transcripts into fixed-duration chunks for labeling.
-4. **Research Labeling** — Train a logistic regression classifier to detect research-mention chunks in transcripts.
-5. **Word Error Rate** — Evaluate transcription accuracy against human-labeled gold standards.
+3. **Word Error Rate** — Evaluate transcription accuracy against human-labeled gold standards before downstream use.
+4. **Transcript Chunking** — Split timestamped transcripts into fixed-duration chunks for labeling.
+5. **Research Labeling** — Train a logistic regression classifier to detect research-mention chunks in transcripts.
 
 ## Repository Structure
 
@@ -32,6 +32,9 @@ Kinder_HERC_Sp26/
 ├── transcription/              # Audio-to-text transcription
 │   ├── parakeet_transcribe.py  # Chunked long-form transcription with Parakeet
 │   └── requirements.txt
+├── word_error_rate/            # Transcription quality evaluation
+│   ├── wer_norm.py             # Normalized WER calculation
+│   └── requirements.txt
 ├── transcript_chunking/        # Split transcripts into time-window chunks
 │   └── create_chunks.py        # Chunking script (standard library only)
 ├── research_labeling/          # Research-mention classification
@@ -46,9 +49,6 @@ Kinder_HERC_Sp26/
 │   │   └── plots/                # Visualization scripts and PNG outputs
 │   ├── Transcript Data/          # Labeled CSV files (one per meeting)
 │   └── requirements.txt
-├── word_error_rate/            # Transcription quality evaluation
-│   ├── wer_norm.py             # Normalized WER calculation
-│   └── requirements.txt
 ├── requirements.txt            # All Python dependencies (combined)
 └── README.md                   # This file
 ```
@@ -62,7 +62,7 @@ Kinder_HERC_Sp26/
 **Clone and set up a virtual environment:**
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:RiceD2KLab/Kinder_HERC_Sp26.git
 cd Kinder_HERC_Sp26
 python -m venv .venv
 source .venv/bin/activate        # Linux / macOS
@@ -76,12 +76,13 @@ Or install per-component (each subdirectory has its own `requirements.txt`):
 |-----------|-------------|
 | Web Scraping | `yt-dlp`, `requests`, `beautifulsoup4`, `lxml`, `tqdm` |
 | Transcription | `nemo_toolkit[asr]` (includes PyTorch, NVIDIA Parakeet) |
-| Research Labeling | `sentence-transformers`, `scikit-learn`, `pandas`, `numpy`, `matplotlib` |
 | Word Error Rate | `jiwer`, `contractions`, `num2words` |
+| Transcript Chunking | *(standard library only — no extra dependencies)* |
+| Research Labeling | `sentence-transformers`, `scikit-learn`, `pandas`, `numpy`, `matplotlib` |
 
 ## End-to-End Workflow
 
-The four programs are run sequentially. Each step's output becomes the next step's input.
+The five programs are run sequentially. Each step's output becomes the next step's input.
 
 ### Step 1: Download meeting videos
 
@@ -131,7 +132,19 @@ transcripts/
 
 See [transcription/README.md](transcription/README.md) for all CLI options.
 
-### Step 3: Chunk transcripts for labeling
+### Step 3: Evaluate transcription quality
+
+Validate the ASR output before downstream use by comparing against a human reference transcript:
+
+```bash
+python word_error_rate/wer_norm.py reference.txt hypothesis.txt
+```
+
+**Output:** Printed to stdout — WER score, substitution/deletion/insertion counts, and top-10 errors per category.
+
+See [word_error_rate/README.md](word_error_rate/README.md) for normalization details.
+
+### Step 4: Chunk transcripts for labeling
 
 Split each transcript into fixed-duration time windows (default 2 minutes):
 
@@ -145,7 +158,7 @@ python transcript_chunking/create_chunks.py \
 
 See [transcript_chunking/README.md](transcript_chunking/README.md) for options.
 
-### Step 4: Label transcripts and train the classifier
+### Step 5: Label transcripts and train the classifier
 
 The labeled transcript CSVs in `research_labeling/Transcript Data/` are used as training data. To run the classification pipeline:
 
@@ -176,18 +189,6 @@ python graphic.py             # dataset distribution chart
 ```
 
 See [research_labeling/README.md](research_labeling/README.md) for detailed documentation.
-
-### Step 5: Evaluate transcription quality (optional)
-
-Compare an ASR transcript against a human reference:
-
-```bash
-python word_error_rate/wer_norm.py reference.txt hypothesis.txt
-```
-
-**Output:** Printed to stdout — WER score, substitution/deletion/insertion counts, and top-10 errors per category.
-
-See [word_error_rate/README.md](word_error_rate/README.md) for normalization details.
 
 ## Data
 
