@@ -1,4 +1,4 @@
-# Word Error Rate — Transcription Quality Evaluation
+# Word Error Rate - Transcription Quality Evaluation
 
 Calculates Word Error Rate (WER) and detailed error breakdowns between a reference (human) transcript and a hypothesis (ASR-generated) transcript.
 

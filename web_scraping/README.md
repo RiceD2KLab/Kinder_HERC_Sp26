@@ -1,4 +1,4 @@
-# Web Scraping — School Board Meeting Downloader
+# Web Scraping - School Board Meeting Downloader
 
 Downloads school board meeting videos and extracts audio as WAV files. Supports direct Swagit video URLs as well as any district webpage that embeds Swagit video links — including paginated archives, Bootstrap tab panes, and iframe-embedded players.
 
