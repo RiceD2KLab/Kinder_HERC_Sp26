@@ -23,6 +23,7 @@ import nemo.collections.asr as nemo_asr
 import textwrap
 
 
+
 ###############################################################################
 # Text formatting helpers
 ###############################################################################
@@ -484,6 +485,18 @@ def plan_chunks(
 
     return blocks
 
+##############################################################################
+# Load asr model
+############################################################################
+def load_asr_model(model: str = "nvidia/parakeet-tdt-0.6b-v3"):
+    print(f"Loading ASR Model: {model}")
+    asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=model)
+    print(f"Model loaded: {type(asr_model).__name__}")
+    return asr_model
+
+
+
+
 
 ###############################################################################
 # Transcription
@@ -543,6 +556,103 @@ def is_audio_file(p: Path) -> bool:
 # Main
 ###############################################################################
 
+
+#############################################################################
+# Run Transcription -- Separates logic of transcribing the input file
+############################################################################
+def run_transcription(input_path: Path, output_path: Path, model:str, no_highpass: bool = False,
+    no_lowpass: bool = False,
+    highpass_hz: int = 80,
+    lowpass_hz: int = 7500,
+    chunk_s: float = 35.0,
+    overlap_s: float = 1.0,
+    hour_block_s: float = 3600.0,
+    batch_size: int = 8,
+    wrap_width: int = 100,
+    section_s: int = 30,
+    no_sections: bool = False):
+    in_path = Path(input_path).expanduser().resolve()
+    out_dir = Path(output_path).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Collect input audio files
+    if in_path.is_dir():
+        audio_files = sorted([p for p in in_path.rglob("*") if p.is_file() and is_audio_file(p)])
+    elif in_path.is_file():
+        audio_files = [in_path]
+    else:
+        raise FileNotFoundError(f"Input not found: {in_path}")
+
+    if not audio_files:
+        print("No audio files found.")
+        sys.exit(0)
+
+    print(f"Loading model: {model}")
+    if model is None:
+        print(f"Loading model: {model}")
+        asr_model = load_asr_model(model)
+
+    with tempfile.TemporaryDirectory(prefix="parakeet_tmp_") as tmp:
+        tmp_dir = Path(tmp)
+
+        for src in audio_files:
+            print(f"\n=== Processing: {src.name} ===")
+
+            # Preprocess: convert to mono 16kHz WAV with bandpass filtering
+            standardized = tmp_dir / f"{src.stem}__std.wav"
+            preprocess_audio_to_wav(
+                input_path=src,
+                output_wav=standardized,
+                sample_rate=16000,
+                mono=True,
+                pcm="pcm_s16le",
+                highpass_hz=None if no_highpass else highpass_hz,
+                lowpass_hz=None if no_lowpass else lowpass_hz,
+            )
+
+            # Plan and extract overlapping chunks
+            blocks = plan_chunks(
+                wav_path=standardized,
+                chunk_s=chunk_s,
+                overlap_s=overlap_s,
+                hour_block_s=hour_block_s,
+                tmp_dir=tmp_dir,
+            )
+
+            all_block_texts: List[str] = []
+
+            for b_idx, chunks in enumerate(blocks):
+                for ch in chunks:
+                    extract_wav_segment(standardized, ch.start_s, ch.dur_s, ch.path)
+
+                chunk_texts = transcribe_chunks(
+                    asr_model, chunks, batch_size=batch_size
+                )
+
+                # Merge chunks with overlap deduplication
+                if no_sections:
+                    merged_text = merge_transcripts(chunk_texts)
+                    merged_text = wrap_paragraphs(merged_text, width=wrap_width)
+                else:
+                    merged_text = build_sectioned_transcript(
+                        chunks=chunks,
+                        chunk_texts=chunk_texts,
+                        section_s=section_s,
+                        wrap_width=wrap_width,
+                    )
+
+                all_block_texts.append(merged_text)
+
+            # Write final transcript
+            final_text = "\n\n".join(all_block_texts).strip()
+            txt_path = out_dir / f"{src.stem}.txt"
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(final_text + "\n")
+            return(f"Wrote transcript: {txt_path}")
+            
+
+
+
 def main():
     """Parse arguments, load the ASR model, and transcribe all input audio files.
 
@@ -580,84 +690,10 @@ def main():
     ap.add_argument("--no_sections", action="store_true", help="Disable [MM:SS–MM:SS] section headers.")
 
     args = ap.parse_args()
+    transcript_msg = run_transcription(args.input, args.output_dir, args.model, args.no_highpass, args.no_lowpass, args.highpass_hz, args.lowpass_hz,
+                      args.chunk_s, args.overlap_s, args.hour_block_s, args.batch_size, args.wrap_width, args.section_s, args.no_sections)
 
-    in_path = Path(args.input).expanduser().resolve()
-    out_dir = Path(args.output_dir).expanduser().resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Collect input audio files
-    if in_path.is_dir():
-        audio_files = sorted([p for p in in_path.rglob("*") if p.is_file() and is_audio_file(p)])
-    elif in_path.is_file():
-        audio_files = [in_path]
-    else:
-        raise FileNotFoundError(f"Input not found: {in_path}")
-
-    if not audio_files:
-        print("No audio files found.")
-        sys.exit(0)
-
-    print(f"Loading model: {args.model}")
-    asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=args.model)
-
-    with tempfile.TemporaryDirectory(prefix="parakeet_tmp_") as tmp:
-        tmp_dir = Path(tmp)
-
-        for src in audio_files:
-            print(f"\n=== Processing: {src.name} ===")
-
-            # Preprocess: convert to mono 16kHz WAV with bandpass filtering
-            standardized = tmp_dir / f"{src.stem}__std.wav"
-            preprocess_audio_to_wav(
-                input_path=src,
-                output_wav=standardized,
-                sample_rate=16000,
-                mono=True,
-                pcm="pcm_s16le",
-                highpass_hz=None if args.no_highpass else args.highpass_hz,
-                lowpass_hz=None if args.no_lowpass else args.lowpass_hz,
-            )
-
-            # Plan and extract overlapping chunks
-            blocks = plan_chunks(
-                wav_path=standardized,
-                chunk_s=args.chunk_s,
-                overlap_s=args.overlap_s,
-                hour_block_s=args.hour_block_s,
-                tmp_dir=tmp_dir,
-            )
-
-            all_block_texts: List[str] = []
-
-            for b_idx, chunks in enumerate(blocks):
-                for ch in chunks:
-                    extract_wav_segment(standardized, ch.start_s, ch.dur_s, ch.path)
-
-                chunk_texts = transcribe_chunks(
-                    asr_model, chunks, batch_size=args.batch_size
-                )
-
-                # Merge chunks with overlap deduplication
-                if args.no_sections:
-                    merged_text = merge_transcripts(chunk_texts)
-                    merged_text = wrap_paragraphs(merged_text, width=args.wrap_width)
-                else:
-                    merged_text = build_sectioned_transcript(
-                        chunks=chunks,
-                        chunk_texts=chunk_texts,
-                        section_s=args.section_s,
-                        wrap_width=args.wrap_width,
-                    )
-
-                all_block_texts.append(merged_text)
-
-            # Write final transcript
-            final_text = "\n\n".join(all_block_texts).strip()
-            txt_path = out_dir / f"{src.stem}.txt"
-            with open(txt_path, "w", encoding="utf-8") as f:
-                f.write(final_text + "\n")
-            print(f"Wrote transcript: {txt_path}")
-
+    print(transcript_msg)
 
 if __name__ == "__main__":
     main()

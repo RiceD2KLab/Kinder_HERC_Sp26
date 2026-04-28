@@ -212,10 +212,6 @@ def main() -> None:
     )
 
     args = ap.parse_args()
-
-    # Parse cutoff date
-    cutoff = datetime.strptime(args.cutoff, "%Y-%m-%d").date()
-
     # Collect sources
     sources: List[Source] = []
     if args.sources_file is not None:
@@ -228,26 +224,47 @@ def main() -> None:
     if not sources:
         raise SystemExit("No sources provided. Use --source or --sources-file.")
 
-    # Ensure output directory exists
-    args.out.mkdir(parents=True, exist_ok=True)
-
-    # Decide worker count
+     # Decide worker count
     if args.workers and args.workers > 0:
         workers = args.workers
     else:
         workers = min(8, (os.cpu_count() or 4))
 
-    cfg = PipelineConfig(
-        out_root=args.out,
-        cutoff=cutoff,
-        fragment_workers=args.frag_workers,
-        max_candidates=args.max_candidates,
-        include_title_regex=args.include_title,
-        include_anchor_label_regex=(args.include_anchor_label or None),
-        min_date=cutoff,
-        ffmpeg_location=args.ffmpeg_location,
-    )
+    #Now actually run the scraping pipeline
+    run_scraping_pipeline(args.frag_workers, args.max_candidates, args.include_title, args.include_anchor_label, workers, sources, args.out, args.cutoff, args.ffmpeg_location)
 
+
+
+
+def run_scraping_pipeline(
+        frag_workers: int,
+        max_candidates: int,
+        include_title: str,
+        include_anchor_label: str,
+        workers: int,
+        sources: List[Source],
+        out_path: Path = Path("School Board Meetings"),
+        cutoff_str: str = "2024-09-01",
+        ffmpeg_loc: Path = None,
+        ):
+    # Parse cutoff date
+    cutoff = datetime.strptime(cutoff_str, "%Y-%m-%d").date()
+
+    
+    # Ensure output directory exists
+    out_path.mkdir(parents=True, exist_ok=True)
+
+
+    cfg = PipelineConfig(
+        out_root=out_path,
+        cutoff=cutoff,
+        fragment_workers=frag_workers,
+        max_candidates=max_candidates,
+        include_title_regex=include_title,
+        include_anchor_label_regex=(include_anchor_label or None),
+        min_date=cutoff,
+        ffmpeg_location=ffmpeg_loc,
+    )
     # Run sources concurrently
     def _run_one(src: Source) -> Tuple[bool, str]:
         def _status(line: str) -> None:
@@ -263,7 +280,7 @@ def main() -> None:
 
         for fut in tqdm(as_completed(futures), total=len(futures), desc="Sources"):
             results.append(fut.result())
-
+    
     # Summarize
     ok_count = sum(1 for ok, _ in results if ok)
     print(f"\nDone. Success={ok_count}/{len(results)}")
