@@ -456,16 +456,15 @@ class App(ctk.CTk):
 
                 from transcription.parakeet_transcribe import run_transcription, load_asr_model
                 self.after(0, self._log,"Attempting to load ASR model")
-                asr_model = load_asr_model()
+                #asr_model = load_asr_model()
                 self.after(0, self._log, "Model successfully loaded. Beginning transcription...")
 
                 for i, ap in enumerate(audio_files, 1):
                     self.after(0, self._log, f"      [{i}/{n}] {ap.name}")
                     run_transcription(
-                        audio_path=ap,              # ← input: full path to audio
-                        output_dir=transcript_dir,  # ← output: where .txt is written
-                        asr_model=asr_model,
-                        ffmpeg_path=ffmpeg_location or None
+                        input_path=ap,              
+                        output_path=transcript_dir,  
+                        model="nvidia/parakeet-tdt-0.6b-v3",
                     )
 
                 self.after(0, self._set_status,

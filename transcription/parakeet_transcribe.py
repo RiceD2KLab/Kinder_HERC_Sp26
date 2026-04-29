@@ -587,10 +587,12 @@ def run_transcription(input_path: Path, output_path: Path, model:str, no_highpas
         print("No audio files found.")
         sys.exit(0)
 
-    print(f"Loading model: {model}")
-    if model is None:
-        print(f"Loading model: {model}")
-        asr_model = load_asr_model(model)
+    # print(f"Loading model: {model}")
+    # if model is None:
+    #     print(f"Loading model: {model}")
+    #     asr_model = load_asr_model(model)
+    # print(f"Loading model: {model}")
+    asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=model)
 
     with tempfile.TemporaryDirectory(prefix="parakeet_tmp_") as tmp:
         tmp_dir = Path(tmp)
