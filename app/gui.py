@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 from tkinter import filedialog, messagebox
 import tkinter as tk
+from transcription.parakeet_transcribe import run_transcription
+
 
 #to help w path finding
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -84,7 +86,7 @@ class App(ctk.CTk):
         self.tab_view.add("Website URL")
         self.tab_view.add("Upload File(s)")
  
-        # Tab 1 — YouTube URL
+        # Tab 1 — Website URL
         tab_url = self.tab_view.tab("Website URL")
         ctk.CTkLabel(
             tab_url, text="Website URL",
@@ -95,25 +97,7 @@ class App(ctk.CTk):
             placeholder_text="https://www.swagit.com/...",
             height=40, font=ctk.CTkFont(size=13)
         )
-        self.url_entry.pack(fill="x", pady=(4, 0))
- 
-        # ctk.CTkLabel(
-        #     tab_url, text="ffmpeg location  (optional — leave blank if ffmpeg is on PATH)",
-        #     font=ctk.CTkFont(size=11), text_color="gray"
-        # ).pack(anchor="w", pady=(10, 0))
- 
-        # ffmpeg_row = ctk.CTkFrame(tab_url, fg_color="transparent")
-        # ffmpeg_row.pack(fill="x", pady=(4, 0))
-        # self.ffmpeg_entry = ctk.CTkEntry(
-        #     ffmpeg_row,
-        #     placeholder_text="e.g.  C:/ffmpeg/bin/ffmpeg.exe  or  /usr/local/bin/ffmpeg",
-        #     height=36, font=ctk.CTkFont(size=12)
-        # )
-        # self.ffmpeg_entry.pack(side="left", fill="x", expand=True)
-        # ctk.CTkButton(
-        #     ffmpeg_row, text="Browse", width=80, height=36,
-        #     command=self._pick_ffmpeg_path
-        # ).pack(side="left", padx=(8, 0))
+        self.url_entry.pack(fill="x", pady=(3, 0)) #changed from 4 to 3
  
         # Tab 2 — Audio File(s) / Folder
         tab_audio = self.tab_view.tab("Upload File(s)")
@@ -145,7 +129,7 @@ class App(ctk.CTk):
             tab_audio, text="No files selected.",
             font=ctk.CTkFont(size=12), text_color="gray", anchor="w"
         )
-        self.audio_summary_label.pack(fill="x", pady=(8, 0))
+        self.audio_summary_label.pack(fill="x", pady=(7, 0)) #changed from 8 to 7
  
         # ── Output directory ───────────────────────────────────────────────────
         out_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -234,15 +218,6 @@ class App(ctk.CTk):
         self.open_btn.pack(padx=40, pady=(12, 22), fill="x")
  
     # ── File pickers ───────────────────────────────────────────────────────────
-    # def _pick_ffmpeg_path(self):
-    #     path = filedialog.askopenfilename(
-    #         title="Locate ffmpeg binary",
-    #         filetypes=[("Executable", "ffmpeg ffmpeg.exe *"), ("All files", "*.*")],
-    #     )
-    #     if path:
-    #         self.ffmpeg_entry.delete(0, "end")
-    #         self.ffmpeg_entry.insert(0, path)
- 
     def _pick_audio_files(self):
         filetypes = [
             ("Upload files", " ".join(f"*{ext}" for ext in AUDIO_EXTENSIONS)),
@@ -448,19 +423,18 @@ class App(ctk.CTk):
                 n = len(audio_files)
 
                 # ── Step 2: Transcribe ─────────────────────────────────────
-                self.after(0, self._set_status, f"Step 2/4 — {n} file(s)…", 0.30)
+                self.after(0, self._set_status, f"Step 2/4 — Transcribing {n} file(s)…", 0.30)
                 self.after(0, self._log, f"[2/4] Transcribing with Parakeet {n} file(s)…")
 
                 transcript_dir = tmp_path / "transcripts"
                 transcript_dir.mkdir()
 
-                from transcription.parakeet_transcribe import run_transcription, load_asr_model
                 self.after(0, self._log,"Attempting to load ASR model")
                 #asr_model = load_asr_model()
                 self.after(0, self._log, "Model successfully loaded. Beginning transcription...")
 
                 for i, ap in enumerate(audio_files, 1):
-                    self.after(0, self._log, f"      [{i}/{n}] {ap.name}")
+                    self.after(0, self._log, f"      ({i}/{n}) {ap.name}")
                     run_transcription(
                         input_path=ap,              
                         output_path=transcript_dir,  
@@ -468,7 +442,7 @@ class App(ctk.CTk):
                     )
 
                 self.after(0, self._set_status,
-                               f"Step 2/4 — Transcribed {i}/{n}")
+                               f"Step 2/4 — Transcribed {i}/{n}", 0.50)
 
 
 
@@ -500,7 +474,7 @@ class App(ctk.CTk):
                     )
                     chunks_map[ap] = csv_output
                     self.after(0, self._set_status,
-                               f"Step 3/4 — Chunked {i}/{n}")
+                               f"Step 3/4 — Chunked {i}/{n}", 0.70)
                 
                 
                 #chunks_csv = tmp_path / district_name / f"{audio_path.stem}.csv"
@@ -515,11 +489,10 @@ class App(ctk.CTk):
                 self.after(0, self._set_status, "Step 4/4 — Running model & building report…", 0.80)
                 self.after(0, self._log, "[4/4] Running Logistic Regression model…")
 
-                from research_labeling import pipeline
-                # predictions = run_predictions(
-                #     chunks_csv=chunks_csv,
-                #     log_fn=lambda m: self.after(0, self._log, m)
-                # )
+                from research_labeling.research_chunk_pipeline.pipeline import run_pipeline
+                from research_labeling.research_chunk_pipeline import config
+                config_var = config.Config(csv_output)
+                predictions = run_pipeline(config_var) #dict containing all summary metrics
 
                 # stem = audio_path.stem
                 # docx_path = out_dir / f"{stem}_highlighted.docx"
@@ -533,7 +506,7 @@ class App(ctk.CTk):
                 # )
 
                 # self._result_path = str(docx_path)
-                # self.after(0, self._set_status, "Done! Transcript saved.", 1.0)
+                self.after(0, self._set_status, "Done! Transcript saved.", 1.0)
                 # self.after(0, self._log, f"\n✅ Done! Saved to: {docx_path}")
                 # self.after(0, self.open_btn.configure, {"state": "normal"})
                 # self.after(0, self._show_preview, predictions)

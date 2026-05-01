@@ -153,7 +153,7 @@ def chunk_by_time(segments: list[dict], window_seconds: int) -> list[dict]:
     return chunks
 
 
-def chunk_transcript(input_path: Path, output_path: Path, chunk_minutes: int)
+def chunk_transcript(input_path: Path, output_path: Path, chunk_minutes: int):
     text = input_path.read_text(encoding="utf-8")
     segments = parse_segments(text)
     window_seconds = chunk_minutes * 60
