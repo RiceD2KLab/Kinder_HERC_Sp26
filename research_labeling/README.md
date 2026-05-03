@@ -26,6 +26,7 @@ research_labeling/
 │   ├── embedding_utils.py      # Sentence embedding and feature construction
 │   ├── modeling.py             # Logistic regression training and evaluation
 │   ├── pipeline.py             # End-to-end orchestration and CLI
+│   ├── cv_pipeline.py          # Grouped K-Fold cross-validation CLI
 │   ├── analyze_errors.py       # Post-hoc false positive/negative analysis
 │   ├── outputs/                # Pipeline output CSVs and JSON
 │   └── plots/                  # Visualization scripts and PNG outputs
@@ -64,14 +65,14 @@ Each CSV in `Transcript Data/` represents one school board meeting and must cont
 
 ## Usage
 
-### Run the classification pipeline
+---
+
+### `pipeline.py` — single train/val/test run
 
 ```bash
 cd research_chunk_pipeline
 python pipeline.py --transcript-data-dir "../Transcript Data"
 ```
-
-### CLI Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -81,8 +82,10 @@ python pipeline.py --transcript-data-dir "../Transcript Data"
 | `--feature-mode` | `chunk_only` | `chunk_only` or `query_conditioned` (concatenates a query embedding) |
 | `--query-text` | *"How are research..."* | Guiding question used when `--feature-mode=query_conditioned` |
 | `--save-embeddings` | off | Persist the full feature matrix as a `.npy` file |
+| `--seed` | `42` | Random seed for split assignment and model training |
+| `--no-stratify` | off | Use a pure random transcript shuffle instead of balancing the positive rate across splits |
 
-### Example: query-conditioned features
+#### Example: query-conditioned features
 
 ```bash
 python pipeline.py \
@@ -92,7 +95,7 @@ python pipeline.py \
   --query-text "How are research, data, reports, or studies used to make informed decisions?"
 ```
 
-### Example: context window (previous + current + next chunk)
+#### Example: context window (previous + current + next chunk)
 
 ```bash
 python pipeline.py \
@@ -101,12 +104,70 @@ python pipeline.py \
   --context-window 1
 ```
 
+#### Example: true random splits with a custom seed
+
+```bash
+python pipeline.py \
+  --transcript-data-dir "../Transcript Data" \
+  --feature-mode query_conditioned \
+  --no-stratify \
+  --seed 7
+```
+
+---
+
+### `cv_pipeline.py` — grouped K-fold cross-validation
+
+Chunks from the same transcript always stay in the same fold — no data leakage. The `--n-folds` value controls the approximate train/test ratio per fold:
+
+| `--n-folds` | Approx. train / test |
+|-------------|----------------------|
+| `3` | ~67 / 33 |
+| `4` | ~75 / 25 |
+| `5` (default) | ~80 / 20 |
+
+```bash
+cd research_chunk_pipeline
+python cv_pipeline.py --transcript-data-dir "../Transcript Data" --n-folds 5
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--transcript-data-dir` | *(required)* | Directory containing transcript CSV files |
+| `--output-dir` | `outputs` | Directory where `cv_results.json` will be written |
+| `--n-folds` | `5` | Number of CV folds (controls train/test ratio) |
+| `--val-fraction` | `0.2` | Fraction of each fold's training transcripts held out for threshold/hyperparameter selection |
+| `--seed` | `42` | Random seed for inner val split and model training |
+| `--feature-mode` | `chunk_only` | `chunk_only` or `query_conditioned` |
+| `--query-text` | *"How are research..."* | Guiding question for `query_conditioned` mode |
+| `--context-window` | `0` | Neighboring chunks to join before embedding |
+
+#### Example: ~70/30 split with a custom seed
+
+```bash
+python cv_pipeline.py \
+  --transcript-data-dir "../Transcript Data" \
+  --n-folds 3 \
+  --seed 7
+```
+
+#### Example: 80/20 with query-conditioned features
+
+```bash
+python cv_pipeline.py \
+  --transcript-data-dir "../Transcript Data" \
+  --n-folds 5 \
+  --feature-mode query_conditioned \
+  --seed 42
+```
+
 ### Generate evaluation plots
 
 ```bash
 cd research_chunk_pipeline/plots
-python visualize_results.py   # produces confusion_matrix.png, threshold_sweep.png, metrics_summary.png
-python graphic.py             # produces dataset_distribution.png
+python visualize_results.py      # confusion_matrix.png, threshold_sweep.png, metrics_summary.png
+python visualize_cv_results.py   # cv_fold_metrics.png, cv_aggregate_metrics.png, cv_confusion_summary.png
+python graphic.py                # dataset_distribution.png
 ```
 
 ### Analyze model errors (standalone)
@@ -132,6 +193,7 @@ Written to `research_chunk_pipeline/outputs/`:
 | `transcript_split_assignments.csv` | One row per transcript showing its assigned split |
 | `validation_threshold_sweep.csv` | Metrics at every candidate threshold for each model configuration |
 | `feature_matrix.npy` | Optional: raw feature matrix (requires `--save-embeddings`) |
+| `cv_results.json` | Cross-validation results: per-fold metrics and aggregate mean ± std (written by `cv_pipeline.py`) |
 
 Written to `research_chunk_pipeline/plots/`:
 
@@ -141,6 +203,9 @@ Written to `research_chunk_pipeline/plots/`:
 | `threshold_sweep.png` | Threshold vs. metrics line chart |
 | `metrics_summary.png` | Metrics bar chart |
 | `dataset_distribution.png` | Dataset split and class distribution |
+| `cv_fold_metrics.png` | Per-fold recall / precision / F2 lines with mean ± std bands |
+| `cv_aggregate_metrics.png` | Aggregate mean ± std bar chart across all folds |
+| `cv_confusion_summary.png` | Confusion matrix summed across all CV folds |
 
 ## Pipeline Design
 
@@ -169,7 +234,8 @@ Default query (when using `query_conditioned`):
 ### Other design decisions
 
 - **Optional query-conditioned features** can frame classification as "is this chunk relevant to the research question?" by concatenating chunk and query embeddings (pass `--feature-mode query_conditioned`).
-- **Fixed random seed (42)** ensures reproducible splits and model training across runs.
+- **Configurable random seed** (`--seed`, default `42`) controls both split assignment and model training, ensuring reproducibility. Pass a different seed to test split sensitivity.
+- **Stratified splitting** (default) balances the positive rate across train / val / test. Pass `--no-stratify` to use a pure random transcript shuffle instead — useful for diagnosing whether performance depends on how the splits were drawn.
 
 ## Reproducing Results
 

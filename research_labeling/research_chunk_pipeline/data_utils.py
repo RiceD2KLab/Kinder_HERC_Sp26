@@ -221,7 +221,8 @@ def _target_split_counts(
     for name in sorted(raw, key=lambda k: raw[k] - counts[k], reverse=True)[:remainder]:
         counts[name] += 1
 
-    if any(v == 0 for v in counts.values()):
+    fractions = {"train": train_fraction, "val": val_fraction, "test": test_fraction}
+    if any(v == 0 and fractions[k] > 0 for k, v in counts.items()):
         raise ValueError(
             "Too few transcripts for non-empty train / val / test splits. "
             f"Computed counts: {counts}"
@@ -235,6 +236,7 @@ def assign_transcript_splits(
     val_fraction: float,
     test_fraction: float,
     random_seed: int = 42,
+    stratify: bool = True,
 ) -> pd.DataFrame:
     """Assign each transcript to train / val / test with a proportional deficit heuristic.
 
@@ -266,6 +268,22 @@ def assign_transcript_splits(
     """
     summary = transcript_summary.copy()
     rng     = random.Random(random_seed)
+
+    if not stratify:
+        target_counts = _target_split_counts(
+            n_transcripts=len(summary),
+            train_fraction=train_fraction,
+            val_fraction=val_fraction,
+            test_fraction=test_fraction,
+        )
+        shuffled = summary.sample(frac=1.0, random_state=random_seed).reset_index(drop=True)
+        labels = (
+            ["train"] * target_counts["train"]
+            + ["val"]   * target_counts["val"]
+            + ["test"]  * target_counts["test"]
+        )
+        shuffled["split"] = labels
+        return shuffled
 
     target_counts = _target_split_counts(
         n_transcripts=len(summary),

@@ -35,23 +35,26 @@ def load_pipeline_outputs():
     """Load metrics and threshold sweep data from pipeline output files.
 
     Inputs:
-        None.  Reads ``metrics_summary.json`` and
+        None.  Reads ``metrics_summary.json`` and optionally
         ``validation_threshold_sweep.csv`` from the ``outputs/`` directory
         relative to this script.
 
     Outputs:
         Tuple ``(summary, sweep)`` where *summary* is the parsed JSON dict
-        and *sweep* is a DataFrame filtered to the best model configuration.
+        and *sweep* is a DataFrame filtered to the best model configuration,
+        or ``None`` if no sweep file exists (e.g. full-train / manual mode).
     """
     with open(os.path.join(OUTPUTS_DIR, "metrics_summary.json")) as f:
         summary = json.load(f)
 
+    sweep_path = os.path.join(OUTPUTS_DIR, "validation_threshold_sweep.csv")
+    if not os.path.exists(sweep_path):
+        return summary, None
+
     best_c  = summary["best_c"]
     best_cw = summary["best_class_weight"]
 
-    sweep = pd.read_csv(
-        os.path.join(OUTPUTS_DIR, "validation_threshold_sweep.csv")
-    )
+    sweep = pd.read_csv(sweep_path)
     sweep = (
         sweep[(sweep["c_value"] == best_c) & (sweep["class_weight"] == best_cw)]
         .sort_values("threshold")
@@ -70,7 +73,7 @@ def plot_confusion_matrix(summary):
     Outputs:
         Saves ``confusion_matrix.png`` to the plots directory.
     """
-    tm        = summary["test_metrics"]
+    tm        = summary["test_metrics"] or summary.get("full_dataset_metrics")
     tp        = tm["true_positive"]
     fp        = tm["false_positive"]
     fn        = tm["false_negative"]
@@ -79,6 +82,7 @@ def plot_confusion_matrix(summary):
     precision = tm["precision"]
     f2        = tm["f2"]
     threshold = summary["best_threshold"]
+    is_full   = summary.get("test_metrics") is None
 
     fig, ax = plt.subplots(figsize=(6, 5))
     fig.patch.set_facecolor("white")
@@ -114,7 +118,8 @@ def plot_confusion_matrix(summary):
 
     total_chunks   = tp + fp + fn + tn
     flagged_chunks = tp + fp
-    ax.text(0.5, 1.08, "Confusion matrix - test set (5 unseen meetings)",
+    split_label = "full dataset" if is_full else "test set (unseen meetings)"
+    ax.text(0.5, 1.08, f"Confusion matrix — {split_label}",
             ha="center", va="bottom", fontsize=15, fontweight="600",
             transform=ax.transAxes)
     ax.text(0.5, 1.01,
@@ -219,15 +224,16 @@ def plot_metrics_summary(summary):
     Outputs:
         Saves ``metrics_summary.png`` to the plots directory.
     """
-    tm        = summary["test_metrics"]
+    tm        = summary["test_metrics"] or summary.get("full_dataset_metrics")
     best_c    = summary["best_c"]
     threshold = summary["best_threshold"]
+    split_label = "full" if summary.get("test_metrics") is None else "test"
 
     metrics = {
-        "Recall\n(test)":       tm["recall"],
-        "Precision\n(test)":    tm["precision"],
-        "F2\n(test)":           tm["f2"],
-        "F1\n(test)":           tm["f1"],
+        f"Recall\n({split_label})":       tm["recall"],
+        f"Precision\n({split_label})":    tm["precision"],
+        f"F2\n({split_label})":           tm["f2"],
+        f"F1\n({split_label})":           tm["f1"],
         "Avg. precision\n(AP)": tm["average_precision"],
     }
     colors = [BLUE, GREEN, RED, GRAY, "#9B59B6"]
@@ -252,9 +258,9 @@ def plot_metrics_summary(summary):
 
     ax.set_ylim(0, 1.15)
     ax.set_ylabel("Score", fontsize=11)
+    title_split = "Full dataset" if split_label == "full" else "Test set"
     ax.set_title(
-        f"Test set performance - 5 Transcripts\n"
-        f"C={best_c}, threshold={threshold}",
+        f"{title_split} performance\nC={best_c}, threshold={threshold}",
         fontsize=11, fontweight="600", pad=10,
     )
     ax.tick_params(axis="x", labelsize=10)
@@ -272,6 +278,9 @@ def plot_metrics_summary(summary):
 if __name__ == "__main__":
     pipeline_summary, threshold_sweep = load_pipeline_outputs()
     plot_confusion_matrix(pipeline_summary)
-    plot_threshold_sweep(pipeline_summary, threshold_sweep)
+    if threshold_sweep is not None:
+        plot_threshold_sweep(pipeline_summary, threshold_sweep)
+    else:
+        print("Skipping threshold sweep plot (no validation sweep data).")
     plot_metrics_summary(pipeline_summary)
     print("\nAll plots saved.")

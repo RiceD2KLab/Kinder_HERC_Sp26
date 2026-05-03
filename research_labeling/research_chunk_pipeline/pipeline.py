@@ -48,9 +48,11 @@ from embedding_utils import (
     save_embeddings,
 )
 from modeling import (
+    ModelSelectionResult,
     evaluate_predictions,
     predict_positive_probabilities,
     select_best_logistic_model,
+    train_logistic_regression,
 )
 
 
@@ -150,6 +152,7 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
         val_fraction=config.split.val_fraction,
         test_fraction=config.split.test_fraction,
         random_seed=config.split.random_seed,
+        stratify=config.split.stratify,
     )
     combined_df = apply_split_assignments(combined_df, split_assignments)
 
@@ -196,20 +199,67 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
 
     # ------------------------------------------------------------------
     # Grid search — train on train, select on val
+    # When val is empty (manual C + threshold run) skip the sweep and
+    # train directly with the pinned values.
     # ------------------------------------------------------------------
-    print("\nRunning model grid search...")
-    selection = select_best_logistic_model(
-        x_train=x_train,
-        y_train=y_train,
-        x_val=x_val,
-        y_val=y_val,
-        c_values=config.model.c_values,
-        class_weight_options=config.model.class_weight_options,
-        thresholds=config.threshold.candidate_thresholds,
-        max_iter=config.model.max_iter,
-        random_seed=config.model.random_seed,
-        solver=config.model.solver,
+    manual_mode = (
+        config.model.fixed_threshold is not None
+        and len(config.model.c_values) == 1
+        and len(x_val) == 0
+        and len(x_test) == 0
     )
+
+    if manual_mode:
+        c_value      = config.model.c_values[0]
+        class_weight = config.model.class_weight_options[0]
+        threshold    = config.model.fixed_threshold
+        print(
+            f"\nManual mode — training directly with "
+            f"C={c_value}, class_weight={class_weight}, threshold={threshold}"
+        )
+        model = train_logistic_regression(
+            x_train=x_train,
+            y_train=y_train,
+            c_value=c_value,
+            class_weight=class_weight,
+            max_iter=config.model.max_iter,
+            random_seed=config.model.random_seed,
+            solver=config.model.solver,
+        )
+        selection = ModelSelectionResult(
+            model=model,
+            best_c=c_value,
+            best_class_weight=class_weight,
+            best_threshold=threshold,
+            validation_metrics=None,
+            validation_sweep_rows=[],
+        )
+    else:
+        print("\nRunning model grid search...")
+        selection = select_best_logistic_model(
+            x_train=x_train,
+            y_train=y_train,
+            x_val=x_val,
+            y_val=y_val,
+            c_values=config.model.c_values,
+            class_weight_options=config.model.class_weight_options,
+            thresholds=config.threshold.candidate_thresholds,
+            max_iter=config.model.max_iter,
+            random_seed=config.model.random_seed,
+            solver=config.model.solver,
+        )
+        # Allow the user to override the auto-selected threshold.
+        if config.model.fixed_threshold is not None:
+            selection = ModelSelectionResult(
+                model=selection.model,
+                best_c=selection.best_c,
+                best_class_weight=selection.best_class_weight,
+                best_threshold=config.model.fixed_threshold,
+                validation_metrics=selection.validation_metrics,
+                validation_sweep_rows=selection.validation_sweep_rows,
+            )
+            print(f"  [threshold overridden by user: {config.model.fixed_threshold}]")
+
     print(
         f"  Best C={selection.best_c}, "
         f"class_weight={selection.best_class_weight}, "
@@ -220,16 +270,25 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
     # Evaluate on all three splits at the selected threshold
     # ------------------------------------------------------------------
     y_train_prob = predict_positive_probabilities(selection.model, x_train)
-    y_val_prob   = predict_positive_probabilities(selection.model, x_val)
-    y_test_prob  = predict_positive_probabilities(selection.model, x_test)
-
     train_metrics = evaluate_predictions(y_train, y_train_prob, selection.best_threshold)
-    val_metrics   = evaluate_predictions(y_val,   y_val_prob,   selection.best_threshold)
-    test_metrics  = evaluate_predictions(y_test,  y_test_prob,  selection.best_threshold)
+
+    if len(x_val) > 0:
+        y_val_prob  = predict_positive_probabilities(selection.model, x_val)
+        val_metrics = evaluate_predictions(y_val, y_val_prob, selection.best_threshold)
+    else:
+        y_val_prob  = np.array([])
+        val_metrics = None
+
+    if len(x_test) > 0:
+        y_test_prob  = predict_positive_probabilities(selection.model, x_test)
+        test_metrics = evaluate_predictions(y_test, y_test_prob, selection.best_threshold)
+    else:
+        y_test_prob  = np.array([])
+        test_metrics = None
 
     print(f"\n  Train  — recall={train_metrics.recall:.3f}  precision={train_metrics.precision:.3f}  F2={train_metrics.f2:.3f}")
-    print(f"  Val    — recall={val_metrics.recall:.3f}  precision={val_metrics.precision:.3f}  F2={val_metrics.f2:.3f}")
-    print(f"  Test   — recall={test_metrics.recall:.3f}  precision={test_metrics.precision:.3f}  F2={test_metrics.f2:.3f}")
+    print(f"  Val    — {f'recall={val_metrics.recall:.3f}  precision={val_metrics.precision:.3f}  F2={val_metrics.f2:.3f}' if val_metrics else '(no val split)'}")
+    print(f"  Test   — {f'recall={test_metrics.recall:.3f}  precision={test_metrics.precision:.3f}  F2={test_metrics.f2:.3f}' if test_metrics else '(no test split)'}")
 
     # ------------------------------------------------------------------
     # Build test-set prediction dataframe
@@ -289,14 +348,16 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
         config.output.output_dir / config.output.transcript_split_filename,
         index=False,
     )
-    pd.DataFrame(selection.validation_sweep_rows).to_csv(
-        config.output.output_dir / config.output.validation_sweep_filename,
-        index=False,
-    )
-    test_predictions.to_csv(
-        config.output.output_dir / config.output.predictions_filename,
-        index=False,
-    )
+    if selection.validation_sweep_rows:
+        pd.DataFrame(selection.validation_sweep_rows).to_csv(
+            config.output.output_dir / config.output.validation_sweep_filename,
+            index=False,
+        )
+    if len(test_df) > 0:
+        test_predictions.to_csv(
+            config.output.output_dir / config.output.predictions_filename,
+            index=False,
+        )
     all_predictions.to_csv(
         config.output.output_dir / "all_transcript_predictions.csv",
         index=False,
@@ -332,6 +393,20 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
     )
     print(f"  False positives: {len(false_positives)}  |  False negatives: {len(false_negatives)}")
 
+    # ------------------------------------------------------------------
+    # Full-dataset metrics (--full-train mode only)
+    # ------------------------------------------------------------------
+    full_metrics = None
+    if config.model.full_train_eval:
+        y_all_true = combined_df["binary_hit"].to_numpy(dtype=int)
+        full_metrics = evaluate_predictions(y_all_true, y_all_prob, selection.best_threshold)
+        print(
+            f"\n  Full dataset — recall={full_metrics.recall:.3f}  "
+            f"precision={full_metrics.precision:.3f}  F2={full_metrics.f2:.3f}  "
+            f"TP={full_metrics.true_positive}  FP={full_metrics.false_positive}  "
+            f"FN={full_metrics.false_negative}  TN={full_metrics.true_negative}"
+        )
+
     metrics_summary: dict[str, Any] = {
         "feature_mode":             config.embedding.feature_mode,
         "query_text":               (
@@ -348,8 +423,9 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
             int(query_embedding.shape[0]) if query_embedding is not None else None
         ),
         "train_metrics":            train_metrics.to_dict(),
-        "validation_metrics":       val_metrics.to_dict(),
-        "test_metrics":             test_metrics.to_dict(),
+        "validation_metrics":       val_metrics.to_dict() if val_metrics is not None else None,
+        "test_metrics":             test_metrics.to_dict() if test_metrics is not None else None,
+        "full_dataset_metrics":     full_metrics.to_dict() if full_metrics is not None else None,
         "dataset_summary": {
             "n_total_chunks":       int(len(combined_df)),
             "n_total_positives":    int(combined_df["binary_hit"].sum()),
@@ -404,7 +480,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--feature-mode",
         choices=["chunk_only", "query_conditioned"],
-        default="query_conditioned",
+        default="chunk_only",
         help=(
             "chunk_only: embed chunk text only.  "
             "query_conditioned: concatenate chunk and query embeddings."
@@ -423,6 +499,85 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Persist the full feature matrix as a .npy file.",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for split assignment and model training (default: 42).",
+    )
+    parser.add_argument(
+        "--no-stratify",
+        action="store_true",
+        help=(
+            "Assign transcripts to splits by pure random shuffle instead of "
+            "balancing the positive rate across splits."
+        ),
+    )
+
+    # --- Manual override: fix C instead of grid-searching ---
+    parser.add_argument(
+        "--c",
+        type=float,
+        default=None,
+        metavar="C",
+        help=(
+            "Pin the logistic regression C to this single value instead of "
+            "grid-searching.  E.g. --c 0.5"
+        ),
+    )
+
+    # --- Manual override: fix the decision threshold ---
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        metavar="THRESH",
+        help=(
+            "Use this probability threshold for classification instead of "
+            "auto-selecting on the validation set.  E.g. --threshold 0.35"
+        ),
+    )
+
+    # --- Manual override: class weight ---
+    parser.add_argument(
+        "--class-weight",
+        type=str,
+        default=None,
+        choices=["balanced", "none"],
+        help=(
+            "Pin the class_weight instead of sweeping.  "
+            "Pass 'balanced' (default grid value) or 'none' for uniform weighting."
+        ),
+    )
+
+    # --- Split fraction control ---
+    parser.add_argument(
+        "--train-fraction",
+        type=float,
+        default=None,
+        help="Fraction of transcripts for training (default: 0.6).  Must sum to 1 with val/test.",
+    )
+    parser.add_argument(
+        "--val-fraction",
+        type=float,
+        default=None,
+        help="Fraction of transcripts for validation (default: 0.2).",
+    )
+    parser.add_argument(
+        "--test-fraction",
+        type=float,
+        default=None,
+        help="Fraction of transcripts for testing (default: 0.2).",
+    )
+    parser.add_argument(
+        "--full-train",
+        action="store_true",
+        help=(
+            "Train on all transcripts (no val/test split) and report metrics "
+            "on the full dataset.  Requires --c and --threshold to be set."
+        ),
+    )
+
     return parser
 
 
@@ -436,6 +591,58 @@ def main() -> None:
     config.embedding.feature_mode     = args.feature_mode
     config.embedding.query_text       = args.query_text
     config.output.save_embeddings     = args.save_embeddings
+    config.split.random_seed          = args.seed
+    config.model.random_seed          = args.seed
+    config.split.stratify             = not args.no_stratify
+
+    # --- Fix C value (skip grid search) ---
+    if args.c is not None:
+        config.model.c_values = [args.c]
+
+    # --- Fix threshold (skip auto-selection) ---
+    if args.threshold is not None:
+        config.model.fixed_threshold = args.threshold
+
+    # --- Fix class weight ---
+    if args.class_weight is not None:
+        cw = None if args.class_weight == "none" else args.class_weight
+        config.model.class_weight_options = [cw]
+
+    # --- Split fractions (resolve any that were left unset) ---
+    train_f = args.train_fraction
+    val_f   = args.val_fraction
+    test_f  = args.test_fraction
+
+    # --full-train: train on everything, report metrics on full dataset.
+    if args.full_train:
+        if args.c is None or args.threshold is None:
+            raise SystemExit("--full-train requires --c and --threshold to be set.")
+        if train_f is None and val_f is None and test_f is None:
+            train_f, val_f, test_f = 1.0, 0.0, 0.0
+        config.model.full_train_eval = True
+    # Manual mode (C + threshold both pinned, no --full-train): default to 80/0/20.
+    elif args.c is not None and args.threshold is not None:
+        if train_f is None and val_f is None and test_f is None:
+            train_f, val_f, test_f = 0.8, 0.0, 0.2
+
+    n_specified = sum(x is not None for x in (train_f, val_f, test_f))
+    if n_specified == 1:
+        raise SystemExit(
+            "Specify either none or at least two of --train-fraction / "
+            "--val-fraction / --test-fraction."
+        )
+    if n_specified == 2:
+        # Infer the missing fraction so the three always sum to 1.
+        if train_f is None:
+            train_f = round(1.0 - val_f - test_f, 10)
+        elif val_f is None:
+            val_f = round(1.0 - train_f - test_f, 10)
+        else:
+            test_f = round(1.0 - train_f - val_f, 10)
+    if n_specified >= 2:
+        config.split.train_fraction = train_f
+        config.split.val_fraction   = val_f
+        config.split.test_fraction  = test_f
 
     results = run_pipeline(config)
     print(json.dumps(results, indent=2))

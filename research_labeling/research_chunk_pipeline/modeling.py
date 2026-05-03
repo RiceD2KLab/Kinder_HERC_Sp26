@@ -2,12 +2,15 @@
 
 Workflow
 --------
-1. ``train_logistic_regression``   - fit one model with given hyper-params
-2. ``predict_positive_probabilities`` - get P(positive) for each example
-3. ``sweep_thresholds``            - evaluate a grid of decision thresholds
-4. ``select_threshold``            - pick the best threshold by F2 score
-5. ``evaluate_predictions``        - compute all metrics at a chosen threshold
-6. ``select_best_logistic_model``  - run the full grid search over C and class_weight
+1. ``train_logistic_regression``   - fit a logistic regression model
+2. ``train_xgboost``               - fit an XGBoost classifier
+3. ``predict_positive_probabilities`` - get P(positive) for each example
+4. ``sweep_thresholds``            - evaluate a grid of decision thresholds
+5. ``select_threshold``            - pick the best threshold by F2 score
+6. ``evaluate_predictions``        - compute all metrics at a chosen threshold
+7. ``select_best_logistic_model``  - grid search over C and class_weight
+8. ``select_best_xgboost_model``   - grid search over XGBoost hyperparameters
+9. ``select_best_model``           - dispatcher: routes to LR or XGBoost
 
 Threshold-selection philosophy
 -------------------------------
@@ -20,7 +23,8 @@ miss fewer research mentions.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
@@ -82,21 +86,29 @@ class SplitMetrics:
 class ModelSelectionResult:
     """Everything produced by the validation-time grid search.
 
+    Works for both logistic regression and XGBoost — the ``model`` field
+    holds whatever fitted estimator was selected.  ``best_params`` always
+    contains the full winning hyperparameter dict regardless of model type.
+    ``best_c`` and ``best_class_weight`` are populated for logistic
+    regression and None for XGBoost (kept for backward compatibility).
+
     Attributes:
-        model:                 The winning fitted LogisticRegression.
-        best_c:                C value of the winning model.
-        best_class_weight:     class_weight of the winning model.
+        model:                 Fitted estimator (LR or XGBoost).
+        best_c:                Winning C for logistic regression; None for XGBoost.
+        best_class_weight:     Winning class_weight for LR; None for XGBoost.
         best_threshold:        Threshold selected on the validation set.
         validation_metrics:    Metrics of the winning model at best_threshold.
         validation_sweep_rows: All threshold-sweep rows (for the CSV artifact).
+        best_params:           Full winning hyperparameter dict for any model type.
     """
 
-    model:                 LogisticRegression
-    best_c:                float
+    model:                 Any
+    best_c:                float | None
     best_class_weight:     str | dict[int, float] | None
     best_threshold:        float
     validation_metrics:    SplitMetrics
     validation_sweep_rows: list[dict[str, float | int | str | None]]
+    best_params:           dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +251,108 @@ def select_threshold(
 
 
 # ---------------------------------------------------------------------------
+# LASSO-based feature selection
+# ---------------------------------------------------------------------------
+
+def select_features_lasso(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,
+    lasso_c_values: list[float],
+    max_iter: int,
+    random_seed: int,
+    criterion: str = "bic",
+) -> tuple[np.ndarray, float, int]:
+    """Select features via LASSO, choosing the sparsity level by AIC or BIC
+    evaluated on the validation set.
+
+    For each candidate C value an L1-penalised logistic regression is fit on
+    the training set.  The information criterion is then computed on the
+    *validation* set so that feature selection uses held-out data:
+
+        BIC = k · log(n_val) − 2 · LL_val
+        AIC = 2k              − 2 · LL_val
+
+    where k is the number of non-zero coefficients and LL_val is the
+    log-likelihood of the fitted model evaluated on (x_val, y_val).
+    Lower is better.  The C whose model achieves the lowest criterion score
+    determines the final feature mask.
+
+    Inputs:
+        x_train:        Training feature matrix ``(n_train, n_features)``.
+        y_train:        Binary training labels ``(n_train,)``.
+        x_val:          Validation feature matrix ``(n_val, n_features)``.
+        y_val:          Binary validation labels ``(n_val,)``.
+        lasso_c_values: Candidate inverse-regularisation strengths.  Smaller
+                        C → stronger L1 penalty → fewer selected features.
+        max_iter:       Maximum solver iterations per fit.
+        random_seed:    Reproducibility seed.
+        criterion:      ``"bic"`` (default) or ``"aic"``.
+
+    Outputs:
+        Tuple of:
+            feature_mask  — Boolean array of shape ``(n_features,)``.  True
+                            for selected dimensions.
+            best_lasso_c  — The C value whose model was chosen.
+            n_selected    — Number of selected features (``mask.sum()``).
+
+    Notes:
+        * ``class_weight="balanced"`` is always used for the LASSO fit because
+          the positive class is rare and an unweighted fit would drive most
+          positive-class coefficients to zero.
+        * If every C value zeroes out all features, the full feature set is
+          returned as a fallback so the fold does not crash.
+    """
+    n_val = len(y_val)
+    best_score: float = np.inf
+    best_mask:  np.ndarray | None = None
+    best_c:     float = lasso_c_values[0]
+
+    for c in lasso_c_values:
+        lasso = LogisticRegression(
+            C=c,
+            penalty="l1",
+            solver="liblinear",
+            class_weight="balanced",
+            max_iter=max_iter,
+            random_state=random_seed,
+        )
+        lasso.fit(x_train, y_train)
+
+        mask = np.abs(lasso.coef_[0]) > 0
+        k = int(mask.sum())
+        if k == 0:
+            # All features zeroed out — skip this C; it's too aggressive.
+            continue
+
+        # Log-likelihood on the validation set.
+        val_probs = np.clip(lasso.predict_proba(x_val)[:, 1], 1e-10, 1 - 1e-10)
+        log_likelihood = float(
+            np.sum(
+                y_val * np.log(val_probs)
+                + (1 - y_val) * np.log(1 - val_probs)
+            )
+        )
+
+        if criterion == "bic":
+            score = k * np.log(n_val) - 2.0 * log_likelihood
+        else:  # aic
+            score = 2.0 * k - 2.0 * log_likelihood
+
+        if score < best_score:
+            best_score = score
+            best_mask  = mask.copy()
+            best_c     = c
+
+    if best_mask is None:
+        # Fallback: every C was too aggressive.  Keep all features.
+        best_mask = np.ones(x_train.shape[1], dtype=bool)
+
+    return best_mask, best_c, int(best_mask.sum())
+
+
+# ---------------------------------------------------------------------------
 # Full grid search
 # ---------------------------------------------------------------------------
 
@@ -323,6 +437,7 @@ def select_best_logistic_model(
                 best_threshold=best_threshold,
                 validation_metrics=val_metrics,
                 validation_sweep_rows=annotated_rows,
+                best_params={"c": c_value, "class_weight": str(class_weight)},
             )
 
             if best is None:
@@ -343,3 +458,225 @@ def select_best_logistic_model(
             "Check that c_values and class_weight_options are non-empty."
         )
     return best
+
+
+# ---------------------------------------------------------------------------
+# XGBoost training and grid search
+# ---------------------------------------------------------------------------
+
+def train_xgboost(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    n_estimators: int,
+    max_depth: int,
+    learning_rate: float,
+    scale_pos_weight: float,
+    random_seed: int,
+    device: str = "cpu",
+) -> Any:
+    """Fit an XGBoost binary classifier.
+
+    ``scale_pos_weight`` is set to n_negatives / n_positives by the caller,
+    which compensates for the class imbalance in the same way that
+    ``class_weight="balanced"`` does for logistic regression.
+
+    Inputs:
+        x_train:          Training feature matrix ``(n_train, n_features)``.
+        y_train:          Binary training labels ``(n_train,)``.
+        n_estimators:     Number of boosting rounds.
+        max_depth:        Maximum tree depth.
+        learning_rate:    Step size shrinkage (eta).
+        scale_pos_weight: Weight ratio for positive class (n_neg / n_pos).
+        random_seed:      Random seed for reproducibility.
+        device:           ``"cpu"`` (default) or ``"cuda"`` for GPU training.
+
+    Outputs:
+        Fitted ``XGBClassifier`` instance.
+    """
+    try:
+        from xgboost import XGBClassifier
+    except ImportError:
+        raise ImportError(
+            "xgboost is not installed.  Run: pip install xgboost"
+        )
+
+    model = XGBClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate,
+        scale_pos_weight=scale_pos_weight,
+        random_state=random_seed,
+        eval_metric="logloss",
+        verbosity=0,
+        device=device,
+    )
+    model.fit(x_train, y_train)
+    return model
+
+
+def select_best_xgboost_model(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,
+    n_estimators_options: list[int],
+    max_depth_options: list[int],
+    learning_rate_options: list[float],
+    thresholds: list[float],
+    random_seed: int,
+    device: str = "cpu",
+) -> ModelSelectionResult:
+    """Grid-search over XGBoost hyperparameters, selecting the best on validation.
+
+    ``scale_pos_weight`` is computed automatically from the training labels
+    as n_negatives / n_positives so class imbalance is always handled.
+
+    The winning configuration is chosen by the same F2-first ordering used
+    for logistic regression: F2 > recall > precision > lower threshold.
+
+    Inputs:
+        x_train:               Training feature matrix.
+        y_train:               Training labels.
+        x_val:                 Validation feature matrix.
+        y_val:                 Validation labels.
+        n_estimators_options:  Candidate numbers of boosting rounds.
+        max_depth_options:     Candidate maximum tree depths.
+        learning_rate_options: Candidate learning rates.
+        thresholds:            Probability-threshold candidates.
+        random_seed:           Seed for reproducibility.
+
+    Outputs:
+        :class:`ModelSelectionResult` with the winning XGBoost model.
+    """
+    # Compute class imbalance weight once from training labels.
+    n_pos = int(y_train.sum())
+    n_neg = int((y_train == 0).sum())
+    scale_pos_weight = n_neg / max(n_pos, 1)
+
+    best: ModelSelectionResult | None = None
+
+    def _rank(result: ModelSelectionResult) -> tuple:
+        m = result.validation_metrics
+        return (m.f2, m.recall, m.precision, -m.threshold)
+
+    for n_est in n_estimators_options:
+        for max_d in max_depth_options:
+            for lr in learning_rate_options:
+
+                model = train_xgboost(
+                    x_train=x_train,
+                    y_train=y_train,
+                    n_estimators=n_est,
+                    max_depth=max_d,
+                    learning_rate=lr,
+                    scale_pos_weight=scale_pos_weight,
+                    random_seed=random_seed,
+                    device=device,
+                )
+
+                y_val_prob    = predict_positive_probabilities(model, x_val)
+                sweep_rows    = sweep_thresholds(y_true=y_val, y_prob=y_val_prob, thresholds=thresholds)
+                best_threshold = select_threshold(sweep_rows=sweep_rows)
+                val_metrics   = evaluate_predictions(
+                    y_true=y_val,
+                    y_prob=y_val_prob,
+                    threshold=best_threshold,
+                )
+
+                annotated_rows = [
+                    {
+                        **row,
+                        "n_estimators": n_est,
+                        "max_depth": max_d,
+                        "learning_rate": lr,
+                    }
+                    for row in sweep_rows
+                ]
+
+                candidate = ModelSelectionResult(
+                    model=model,
+                    best_c=None,
+                    best_class_weight=None,
+                    best_threshold=best_threshold,
+                    validation_metrics=val_metrics,
+                    validation_sweep_rows=annotated_rows,
+                    best_params={
+                        "n_estimators":    n_est,
+                        "max_depth":       max_d,
+                        "learning_rate":   lr,
+                        "scale_pos_weight": round(scale_pos_weight, 3),
+                    },
+                )
+
+                if best is None or _rank(candidate) > _rank(best):
+                    best = candidate
+
+    if best is None:
+        raise RuntimeError(
+            "XGBoost model selection evaluated zero candidates.  "
+            "Check that all option lists are non-empty."
+        )
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Unified dispatcher
+# ---------------------------------------------------------------------------
+
+def select_best_model(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,
+    config: Any,
+    thresholds: list[float],
+    random_seed: int,
+) -> ModelSelectionResult:
+    """Route to the correct model selection function based on config.model_type.
+
+    Inputs:
+        x_train:    Training feature matrix.
+        y_train:    Training labels.
+        x_val:      Validation feature matrix.
+        y_val:      Validation labels.
+        config:     A ``ModelConfig`` instance (from config.py).
+        thresholds: Probability-threshold candidates.
+        random_seed: Seed for reproducibility.
+
+    Outputs:
+        :class:`ModelSelectionResult` from the winning model.
+
+    Raises:
+        ValueError: If ``config.model_type`` is not recognised.
+    """
+    if config.model_type == "logistic_regression":
+        return select_best_logistic_model(
+            x_train=x_train,
+            y_train=y_train,
+            x_val=x_val,
+            y_val=y_val,
+            c_values=config.c_values,
+            class_weight_options=config.class_weight_options,
+            thresholds=thresholds,
+            max_iter=config.max_iter,
+            random_seed=random_seed,
+            solver=config.solver,
+        )
+    elif config.model_type == "xgboost":
+        return select_best_xgboost_model(
+            x_train=x_train,
+            y_train=y_train,
+            x_val=x_val,
+            y_val=y_val,
+            n_estimators_options=config.xgb_n_estimators_options,
+            max_depth_options=config.xgb_max_depth_options,
+            learning_rate_options=config.xgb_learning_rate_options,
+            thresholds=thresholds,
+            random_seed=random_seed,
+            device=config.xgb_device,
+        )
+    else:
+        raise ValueError(
+            f"Unknown model_type '{config.model_type}'.  "
+            "Choose 'logistic_regression' or 'xgboost'."
+        )

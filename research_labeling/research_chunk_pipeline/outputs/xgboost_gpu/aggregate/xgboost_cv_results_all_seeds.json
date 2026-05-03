@@ -1,0 +1,84 @@
+{
+  "experiment": "xgboost_gpu",
+  "model_type": "xgboost",
+  "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "per_seed_results": {
+    "1": {
+      "recall_mean": 0.842, "recall_std": 0.057,
+      "precision_mean": 0.480, "precision_std": 0.090,
+      "f1_mean": 0.602, "f1_std": 0.063,
+      "f2_mean": 0.722, "f2_std": 0.028,
+      "average_precision_mean": 0.748, "average_precision_std": 0.012
+    },
+    "2": {
+      "recall_mean": 0.895, "recall_std": 0.043,
+      "precision_mean": 0.403, "precision_std": 0.046,
+      "f1_mean": 0.554, "f1_std": 0.043,
+      "f2_mean": 0.717, "f2_std": 0.035,
+      "average_precision_mean": 0.738, "average_precision_std": 0.032
+    },
+    "3": {
+      "recall_mean": 0.869, "recall_std": 0.025,
+      "precision_mean": 0.453, "precision_std": 0.033,
+      "f1_mean": 0.594, "f1_std": 0.025,
+      "f2_mean": 0.733, "f2_std": 0.015,
+      "average_precision_mean": 0.740, "average_precision_std": 0.014
+    },
+    "4": {
+      "recall_mean": 0.826, "recall_std": 0.006,
+      "precision_mean": 0.497, "precision_std": 0.048,
+      "f1_mean": 0.619, "f1_std": 0.036,
+      "f2_mean": 0.728, "f2_std": 0.019,
+      "average_precision_mean": 0.737, "average_precision_std": 0.017
+    },
+    "5": {
+      "recall_mean": 0.809, "recall_std": 0.117,
+      "precision_mean": 0.464, "precision_std": 0.045,
+      "f1_mean": 0.582, "f1_std": 0.012,
+      "f2_mean": 0.696, "f2_std": 0.052,
+      "average_precision_mean": 0.712, "average_precision_std": 0.048
+    },
+    "6": {
+      "recall_mean": 0.881, "recall_std": 0.090,
+      "precision_mean": 0.425, "precision_std": 0.081,
+      "f1_mean": 0.563, "f1_std": 0.044,
+      "f2_mean": 0.713, "f2_std": 0.024,
+      "average_precision_mean": 0.727, "average_precision_std": 0.012
+    },
+    "7": {
+      "recall_mean": 0.829, "recall_std": 0.113,
+      "precision_mean": 0.492, "precision_std": 0.083,
+      "f1_mean": 0.604, "f1_std": 0.031,
+      "f2_mean": 0.716, "f2_std": 0.040,
+      "average_precision_mean": 0.739, "average_precision_std": 0.009
+    },
+    "8": {
+      "recall_mean": 0.881, "recall_std": 0.086,
+      "precision_mean": 0.435, "precision_std": 0.060,
+      "f1_mean": 0.577, "f1_std": 0.052,
+      "f2_mean": 0.724, "f2_std": 0.050,
+      "average_precision_mean": 0.725, "average_precision_std": 0.048
+    },
+    "9": {
+      "recall_mean": 0.849, "recall_std": 0.078,
+      "precision_mean": 0.451, "precision_std": 0.087,
+      "f1_mean": 0.582, "f1_std": 0.074,
+      "f2_mean": 0.713, "f2_std": 0.058,
+      "average_precision_mean": 0.709, "average_precision_std": 0.082
+    },
+    "10": {
+      "recall_mean": 0.878, "recall_std": 0.051,
+      "precision_mean": 0.435, "precision_std": 0.082,
+      "f1_mean": 0.576, "f1_std": 0.072,
+      "f2_mean": 0.722, "f2_std": 0.049,
+      "average_precision_mean": 0.737, "average_precision_std": 0.046
+    }
+  },
+  "aggregate_across_seeds": {
+    "recall_mean": 0.856, "recall_std": 0.028,
+    "precision_mean": 0.454, "precision_std": 0.029,
+    "f1_mean": 0.585, "f1_std": 0.019,
+    "f2_mean": 0.718, "f2_std": 0.011,
+    "average_precision_mean": 0.731, "average_precision_std": 0.013
+  }
+}

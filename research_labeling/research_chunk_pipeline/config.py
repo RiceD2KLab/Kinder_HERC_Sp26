@@ -47,6 +47,9 @@ from typing import Literal
 # Type alias for the feature-mode option.
 FeatureMode = Literal["chunk_only", "query_conditioned"]
 
+# Type alias for model type.
+ModelType = Literal["logistic_regression", "xgboost"]
+
 
 # ---------------------------------------------------------------------------
 # Sub-configs
@@ -72,6 +75,7 @@ class SplitConfig:
     val_fraction:   float = 0.2
     test_fraction:  float = 0.2
     random_seed:    int   = 42
+    stratify:       bool  = True
 
     def validate(self) -> None:
         """Raise ValueError if the fractions do not sum to 1.0."""
@@ -129,17 +133,48 @@ class ModelConfig:
                                reproducible initialisation.
         solver:                Scikit-learn solver.  "liblinear" works well for
                                small-to-medium datasets with L1/L2 penalties.
+        fixed_threshold:       If set, skip automatic threshold selection and
+                               use this value directly.  Useful for manual
+                               inspection runs.
     """
 
     c_values:              list[float]                         = field(
-        default_factory=lambda: [0.01, 0.05, 0.75, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0]
+        default_factory=lambda: [0.25, 0.5, 1.0, 1.5, 2.0]
     )
     class_weight_options:  list[str | dict[int, float] | None] = field(
         default_factory=lambda: ["balanced"]
     )
-    max_iter:              int  = 2_000
-    random_seed:           int  = 42
-    solver:                str  = "liblinear"
+    max_iter:              int         = 2_000
+    random_seed:           int         = 42
+    solver:                str         = "liblinear"
+    fixed_threshold:       float | None = None
+    full_train_eval:       bool        = False
+    # LASSO feature-selection settings
+    use_feature_selection: bool        = False
+    lasso_c_values:        list[float] = field(
+        default_factory=lambda: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+    )
+    lasso_criterion:       str         = "bic"
+
+    # ------------------------------------------------------------------
+    # Model type selection
+    # ------------------------------------------------------------------
+    model_type: ModelType = "logistic_regression"
+
+    # ------------------------------------------------------------------
+    # XGBoost hyperparameter search space
+    # (only used when model_type = "xgboost")
+    # ------------------------------------------------------------------
+    xgb_n_estimators_options:  list[int]   = field(
+        default_factory=lambda: [100, 300, 500]
+    )
+    xgb_max_depth_options:     list[int]   = field(
+        default_factory=lambda: [3, 5, 7]
+    )
+    xgb_learning_rate_options: list[float] = field(
+        default_factory=lambda: [0.05, 0.1, 0.3]
+    )
+    xgb_device:                str         = "cpu"
 
 
 @dataclass(slots=True)
