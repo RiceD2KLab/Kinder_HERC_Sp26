@@ -1,8 +1,8 @@
 """
-gui.py — Main GUI entry point for the YouTube Transcript Highlighter app.
+gui.py — Main GUI entry point for the Transcript Highlighter app.
 Wires together: yt-dlp download → Parakeet transcription → chunker → LR model → .docx output
 Supports two input modes:
-  • YouTube URL  → download audio → transcribe → chunk → predict
+  • Website URL  → download audio → transcribe → chunk → predict
   • Local audio file → transcribe → chunk → predict  (skips download step)
 """
 
@@ -14,8 +14,6 @@ import sys
 from pathlib import Path
 from tkinter import filedialog, messagebox
 import tkinter as tk
-from transcription.parakeet_transcribe import run_transcription
-
 
 #to help w path finding
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -80,7 +78,7 @@ class App(ctk.CTk):
         ).pack(pady=(0, 16))
  
         # ── Tab view ───────────────────────────────────────────────────────────
-        self.tab_view = ctk.CTkTabview(self, height=200)
+        self.tab_view = ctk.CTkTabview(self, height=150)
         self.tab_view.pack(fill="x", padx=40)
  
         self.tab_view.add("Website URL")
@@ -97,7 +95,7 @@ class App(ctk.CTk):
             placeholder_text="https://www.swagit.com/...",
             height=40, font=ctk.CTkFont(size=13)
         )
-        self.url_entry.pack(fill="x", pady=(3, 0)) #changed from 4 to 3
+        self.url_entry.pack(fill="x", pady=(4, 0)) 
  
         # Tab 2 — Audio File(s) / Folder
         tab_audio = self.tab_view.tab("Upload File(s)")
@@ -129,7 +127,7 @@ class App(ctk.CTk):
             tab_audio, text="No files selected.",
             font=ctk.CTkFont(size=12), text_color="gray", anchor="w"
         )
-        self.audio_summary_label.pack(fill="x", pady=(7, 0)) #changed from 8 to 7
+        self.audio_summary_label.pack(fill="x", pady=(8, 0))
  
         # ── Output directory ───────────────────────────────────────────────────
         out_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -183,13 +181,13 @@ class App(ctk.CTk):
         self.retry_btn.pack_forget()
  
         # ── Progress ───────────────────────────────────────────────────────────
-        prog_frame = ctk.CTkFrame(self, fg_color="transparent")
-        prog_frame.pack(fill="x", padx=40, pady=(12, 0))
-        self.progress = ctk.CTkProgressBar(prog_frame, height=10)
+        self.prog_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.prog_frame.pack(fill="x", padx=40, pady=(12, 0))
+        self.progress = ctk.CTkProgressBar(self.prog_frame, height=10)
         self.progress.set(0)
         self.progress.pack(fill="x")
         self.status_label = ctk.CTkLabel(
-            prog_frame, text="Ready.",
+            self.prog_frame, text="Ready.",
             font=ctk.CTkFont(size=12), text_color="gray"
         )
         self.status_label.pack(anchor="w", pady=(4, 0))
@@ -210,7 +208,7 @@ class App(ctk.CTk):
  
         # ── Open output folder button ──────────────────────────────────────────
         self.open_btn = ctk.CTkButton(
-            self, text="📂  Open Output Folder",
+            self, text="Open Output Folder",
             height=42, font=ctk.CTkFont(size=13),
             fg_color="green", hover_color="#2d7a2d",
             command=self._open_output_folder, state="disabled"
@@ -306,7 +304,7 @@ class App(ctk.CTk):
         # Re-enable run button and show retry button
         self.run_btn.configure(state="normal")
         self.retry_btn.pack(padx=40, pady=(6, 0), fill="x",
-                            before=self.progress.master)
+                            before=self.prog_frame)
  
     # ── Validation + dispatch ──────────────────────────────────────────────────
     def _start_pipeline(self):
@@ -402,6 +400,7 @@ class App(ctk.CTk):
                             "Check that the URL is accessible and ffmpeg is configured."
                         )
                     
+                    source_labels = {f: url for f in audio_files}
                     #Printing sanity checks
                     self.after(0, self._log,
                                f"      Found {len(audio_files)} audio file(s):")
@@ -425,6 +424,7 @@ class App(ctk.CTk):
                 # ── Step 2: Transcribe ─────────────────────────────────────
                 self.after(0, self._set_status, f"Step 2/4 — Transcribing {n} file(s)…", 0.30)
                 self.after(0, self._log, f"[2/4] Transcribing with Parakeet {n} file(s)…")
+                from transcription.parakeet_transcribe import run_transcription
 
                 transcript_dir = tmp_path / "transcripts"
                 transcript_dir.mkdir()
@@ -441,16 +441,8 @@ class App(ctk.CTk):
                         model="nvidia/parakeet-tdt-0.6b-v3",
                     )
 
-                self.after(0, self._set_status,
-                               f"Step 2/4 — Transcribed {i}/{n}", 0.50)
-
-
-
-                # audio_path = transcript_dir / audio_files[0]
-                # self.after(0, self._log, f"      Transcript: {audio_path.name}")
-
-                # transcript_path = run_transcription(audio_path, transcript_dir)
-                # self._log(transcript_path)
+                self.after(0, self._set_status, f"Step 2/4 — Transcribed {i}/{n}", 0.50)
+                self.after(0, self._log, f"Finished transcribing {n} file(s). Transcripts saved to: {transcript_dir}")
 
                 # ── Step 3: Chunk ──────────────────────────────────────────
                 self.after(0, self._set_status, f"Step 3/4 — Chunking {n} transcript…", 0.60)
@@ -466,50 +458,44 @@ class App(ctk.CTk):
                     # The transcript was written to transcript_dir/<audio_stem>.txt
                     transcript_path = transcript_dir / f"{ap.stem}.txt"
                     csv_output = chunks_dir / f"{ap.stem}_chunks.csv"
-                    self.after(0, self._log, f"      [{i}/{n}] {ap.name}")
+                    self.after(0, self._log, f"      ({i}/{n}) {ap.name}")
                     create_chunks.chunk_transcript(
                         input_path=transcript_path,
                         output_path=csv_output,
                         chunk_minutes=2,
                     )
                     chunks_map[ap] = csv_output
-                    self.after(0, self._set_status,
-                               f"Step 3/4 — Chunked {i}/{n}", 0.70)
+                    self.after(0, self._set_status, f"Step 3/4 — Chunked {i}/{n}", 0.70)
+                    self.after(0, self._log, f"Finished chunking {ap.name}")
                 
                 
-                #chunks_csv = tmp_path / district_name / f"{audio_path.stem}.csv"
-                # from transcript_chunking import create_chunks
-                # create_chunks.chunk_transcript(
-                #     input_path=transcript_path,
-                #     output_path=chunks_csv,
-                #     chunk_minutes=2,
-                # )
-
                 # ── Step 4: Predict + build docx ──────────────────────────
+                from trained_model import run_predictions
+                from highlighter import build_docx
                 self.after(0, self._set_status, "Step 4/4 — Running model & building report…", 0.80)
                 self.after(0, self._log, "[4/4] Running Logistic Regression model…")
 
-                from research_labeling.research_chunk_pipeline.pipeline import run_pipeline
-                from research_labeling.research_chunk_pipeline import config
-                config_var = config.Config(csv_output)
-                predictions = run_pipeline(config_var) #dict containing all summary metrics
+                for i, ap in enumerate(audio_files, 1):
+                    predictions = run_predictions(
+                        chunks_csv=chunks_map[ap],
+                        log_fn=lambda m: self.after(0, self._log, m)
+                    )
 
-                # stem = audio_path.stem
-                # docx_path = out_dir / f"{stem}_highlighted.docx"
+                    
 
-                # from pipeline.docx_builder import build_docx
-                # build_docx(
-                #     transcript_path=transcript_txt,
-                #     predictions=predictions,
-                #     output_path=docx_path,
-                #     video_url=source_label
-                # )
+                    docx_path = out_dir / f"{ap.stem}_highlighted.docx"
+                    build_docx(
+                        transcript_path=transcript_dir/f"{ap.stem}.txt",
+                        predictions=predictions,
+                        output_path=docx_path,
+                        video_url=source_labels[ap]
+                    )
 
-                # self._result_path = str(docx_path)
-                self.after(0, self._set_status, "Done! Transcript saved.", 1.0)
-                # self.after(0, self._log, f"\n✅ Done! Saved to: {docx_path}")
-                # self.after(0, self.open_btn.configure, {"state": "normal"})
-                # self.after(0, self._show_preview, predictions)
+            self._result_path = str(docx_path)
+            self.after(0, self._set_status, "Done! Transcript saved.", 1.0)
+            self.after(0, self._log, f"\n Pipeline Done! Saved to: {docx_path}")
+            self.after(0, self.open_btn.configure, {"state": "normal"})
+            # self.after(0, self._show_preview, predictions)
 
         except Exception as e:
             import traceback
@@ -517,41 +503,5 @@ class App(ctk.CTk):
             # Use after() so UI update happens on the main thread
             self.after(0, self._show_error, str(e), tb)
 
-        finally:
-            self.after(0, self.run_btn.configure, {"state": "normal"})
-
-    # ── Preview window ─────────────────────────────────────────────────────────
-    def _show_preview(self, predictions: list):
-        """Pop a scrollable preview window with highlighted chunks."""
-        win = ctk.CTkToplevel(self)
-        win.title("Transcript Preview")
-        win.geometry("720x560")
-
-        ctk.CTkLabel(
-            win, text="Highlighted Transcript",
-            font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(pady=(16, 4))
-
-        ctk.CTkLabel(
-            win, text="Yellow = flagged by model   |   White = not flagged",
-            font=ctk.CTkFont(size=11), text_color="gray"
-        ).pack(pady=(0, 10))
-
-        text_widget = tk.Text(
-            win, wrap="word", font=("Arial", 12), padx=12, pady=8,
-            relief="flat", bg="#1a1a1a", fg="white",
-            selectbackground="#444"
-        )
-        text_widget.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-
-        text_widget.tag_configure("highlight", background="#b5a800", foreground="black")
-        text_widget.tag_configure("normal", foreground="#cccccc")
-        text_widget.tag_configure("header", foreground="#888888", font=("Arial", 10))
-
-        for chunk in predictions:
-            header = f"[{chunk['window_start']} – {chunk['window_end']}]\n"
-            text_widget.insert("end", header, "header")
-            tag = "highlight" if chunk["flagged"] else "normal"
-            text_widget.insert("end", chunk["text"].strip() + "\n\n", tag)
-
-        text_widget.configure(state="disabled")
+        # finally:
+        #     self.after(0, self.run_btn.configure, {"state": "normal"})
