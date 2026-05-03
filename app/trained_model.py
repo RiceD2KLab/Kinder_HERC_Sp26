@@ -121,8 +121,8 @@ def run_predictions(
             "window_start": row["window_start"],
             "window_end":   row["window_end"],
             "text":         row["text"],
-            "predicted_label": row["predicted_label"],
-            "confidence":   round(float(prob), 4),
+            "predicted_label": 1 if prob >= threshold else 0, #calculating label here
+            "predicted_probability":   round(float(prob), 4),
         })
 
     _log(f"(threshold={threshold:.2f})")

@@ -485,9 +485,9 @@ class App(ctk.CTk):
 
                     docx_path = out_dir / f"{ap.stem}_highlighted.docx"
                     build_docx(
-                        transcript_path=transcript_dir/f"{ap.stem}.txt",
                         predictions=predictions,
                         output_path=docx_path,
+                        district=district,
                         video_url=source_labels[ap]
                     )
 
@@ -503,5 +503,5 @@ class App(ctk.CTk):
             # Use after() so UI update happens on the main thread
             self.after(0, self._show_error, str(e), tb)
 
-        # finally:
-        #     self.after(0, self.run_btn.configure, {"state": "normal"})
+        finally:
+            self.after(0, self.run_btn.configure, {"state": "normal"})
