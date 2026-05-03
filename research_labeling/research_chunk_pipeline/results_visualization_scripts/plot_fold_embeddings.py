@@ -122,7 +122,15 @@ def _load_full_data(full_data_path: Path) -> tuple[pd.DataFrame, Path, Path]:
 # ---------------------------------------------------------------------------
 
 def _assign_outcome(df_test: pd.DataFrame) -> pd.Series:
-    """Return a string Series with TP / FP / FN / TN per test chunk."""
+    """Return a string Series with TP / FP / FN / TN per test chunk.
+
+    Inputs:
+        df_test: DataFrame with ``predicted_label`` and ``binary_hit`` columns.
+
+    Outputs:
+        String Series aligned with df_test.index containing one of
+        ``"TP"``, ``"FP"``, ``"FN"``, or ``"TN"`` per row.
+    """
     pred   = df_test["predicted_label"].astype(int)
     actual = pd.to_numeric(df_test["binary_hit"], errors="coerce").fillna(0).astype(int)
     outcome = pd.Series("TN", index=df_test.index)
@@ -133,7 +141,14 @@ def _assign_outcome(df_test: pd.DataFrame) -> pd.Series:
 
 
 def _text_hash(text: str) -> str:
-    """Stable SHA-256 hex digest of a text string (first 16 chars)."""
+    """Return a stable SHA-256 hex digest of a text string (first 16 chars).
+
+    Inputs:
+        text: Input string to hash.
+
+    Outputs:
+        16-character hex string (first 16 characters of the SHA-256 digest).
+    """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
@@ -143,7 +158,21 @@ def _load_or_embed(
     cache_hash: Path,
     use_cache: bool,
 ) -> np.ndarray:
-    """Return embeddings for ``texts``, loading from cache if available."""
+    """Return MPNet embeddings for texts, loading from a .npy cache when valid.
+
+    The cache is considered valid when the stored per-text hashes match the
+    current texts. If the data has changed or use_cache is False, embeddings
+    are recomputed and written to cache.
+
+    Inputs:
+        texts:      List of strings to embed.
+        cache_emb:  Path to the .npy file where embeddings are cached.
+        cache_hash: Path to the .npy file where per-text hashes are cached.
+        use_cache:  If True, load from cache when valid; otherwise re-embed.
+
+    Outputs:
+        Float32 NumPy array of shape ``(len(texts), 768)``.
+    """
     if use_cache and cache_emb.exists() and cache_hash.exists():
         stored_hashes  = np.load(cache_hash, allow_pickle=True)
         current_hashes = np.array([_text_hash(t) for t in texts])
@@ -171,11 +200,29 @@ def _load_or_embed(
 
 
 def _reduce_pca(embeddings: np.ndarray, seed: int = 42) -> np.ndarray:
+    """Reduce embeddings to 2-D with PCA.
+
+    Inputs:
+        embeddings: Float array of shape ``(n_chunks, embedding_dim)``.
+        seed:       Random seed for PCA.
+
+    Outputs:
+        Float array of shape ``(n_chunks, 2)``.
+    """
     print("Running PCA → 2D on full dataset...")
     return PCA(n_components=2, random_state=seed).fit_transform(embeddings)
 
 
 def _reduce_tsne(embeddings: np.ndarray, seed: int = 42) -> np.ndarray:
+    """Reduce embeddings to 2-D using PCA pre-processing followed by t-SNE.
+
+    Inputs:
+        embeddings: Float array of shape ``(n_chunks, embedding_dim)``.
+        seed:       Random seed for PCA and t-SNE.
+
+    Outputs:
+        Float array of shape ``(n_chunks, 2)`` with t-SNE 2-D coordinates.
+    """
     n     = embeddings.shape[0]
     n_pre = min(50, embeddings.shape[1], n - 1)
     print(f"Running PCA → {n_pre}D (pre-processing for t-SNE) on full dataset...")
@@ -192,7 +239,14 @@ def _reduce_tsne(embeddings: np.ndarray, seed: int = 42) -> np.ndarray:
 
 
 def _save_legend(output_path: Path) -> None:
-    """Save a standalone legend PNG with all outcome swatches."""
+    """Save a standalone legend PNG with TP / FP / FN / TN / Background swatches.
+
+    Inputs:
+        output_path: Destination PNG path.
+
+    Outputs:
+        None — saves PNG to output_path.
+    """
     fig, ax = plt.subplots(figsize=(5.5, 2.2))
     fig.patch.set_facecolor(WHITE)
     ax.set_visible(False)
@@ -231,7 +285,25 @@ def _scatter_plot(
     output_path: Path,
     seed: int,
 ) -> None:
-    """Render and save a 2-D scatter plot colored by prediction outcome."""
+    """Render and save a 2-D scatter plot of test outcomes against a gray background.
+
+    Non-test chunks are shown as faint gray background points. Test-fold chunks
+    are colored by prediction outcome (TP/FP/FN/TN) and drawn on top.
+
+    Inputs:
+        coords:           2-D coordinates for all chunks, shape ``(n_chunks, 2)``.
+        outcomes:         String Series with TP/FP/FN/TN labels, aligned to the
+                          test-fold rows of the full DataFrame.
+        test_mask:        Boolean array of shape ``(n_chunks,)``; True for test chunks.
+        method:           Reduction method name shown in the title (``"PCA"`` or
+                          ``"t-SNE"``).
+        predictions_path: Path to the predictions CSV (used in the plot title).
+        output_path:      Destination PNG path.
+        seed:             Random seed shown in the title for reproducibility reference.
+
+    Outputs:
+        None — saves PNG to output_path.
+    """
     n_test = int(test_mask.sum())
     counts = outcomes.value_counts()
 
@@ -303,6 +375,20 @@ def _scatter_plot(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """Parse CLI arguments and generate PCA and t-SNE scatter plots for one fold.
+
+    Inputs:
+        --predictions-path: Path to a fold_X_test_predictions.csv file (required).
+        --full-data-path:   Path to the full labeled dataset — a CSV file or a
+                            directory of CSV files (required).
+        --output-dir:       Directory to write PNGs (defaults to predictions directory).
+        --seed:             Random seed for PCA / t-SNE (default: 42).
+        --no-cache:         Disable embedding cache and re-embed from scratch.
+
+    Outputs:
+        None — writes three PNG files to --output-dir:
+            <stem>_pca.png, <stem>_tsne.png, <stem>_legend.png.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Plot a fold's test predictions in the full-dataset embedding space, "

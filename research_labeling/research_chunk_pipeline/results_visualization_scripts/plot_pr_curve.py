@@ -273,6 +273,20 @@ def plot_pr_curves(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """Parse CLI arguments and generate the precision-recall curve plot.
+
+    Inputs:
+        --experiment-dirs:  One or more experiment root directories containing
+                            seed_*/fold_*_test_predictions.csv files (required).
+        --labels:           Display label per experiment (defaults to directory name).
+        --output-path:      Destination PNG path (default: plots/pr_curve.png).
+        --show-folds:       Draw a thin line per individual fold.
+        --n-points:         Resolution of the shared recall axis (default: 200).
+        --selected-recall:  If set, adds a vertical dotted line at this recall value.
+
+    Outputs:
+        None — saves PNG to --output-path.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Plot mean precision-recall curve with shaded range across all "

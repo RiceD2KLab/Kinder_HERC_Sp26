@@ -128,6 +128,13 @@ def extract_district(transcript_id: str) -> str:
     Matches against the three known district names (case-insensitive).
     Returns 'Unknown' if none match, so the script never crashes on an
     unexpected filename.
+
+    Inputs:
+        transcript_id: Transcript filename stem (e.g. ``"Houston_ISD_2024_09"``).
+
+    Outputs:
+        One of the known district strings (e.g. ``"Houston_ISD"``) or
+        ``"Unknown"`` if no known district is found.
     """
     import re
     for district in KNOWN_DISTRICTS:
@@ -144,6 +151,21 @@ def _load_and_embed(
     transcript_data_dir: Path,
     label_context_window: int = 2,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    """Load all transcript CSVs, embed chunk text with MPNet, and return arrays.
+
+    Inputs:
+        transcript_data_dir: Directory containing one labeled CSV per meeting.
+        label_context_window: Number of neighboring chunks on each side to join
+                              for the CSV ``label_context_text`` column. Does not
+                              affect the embeddings (which use chunk-only text).
+
+    Outputs:
+        Tuple of:
+            embeddings — Float32 array of shape ``(n_chunks, 768)``.
+            labels     — Int array of shape ``(n_chunks,)`` with 0/1 binary labels.
+            df         — Combined DataFrame with all chunk rows and a
+                         ``label_context_text`` column added.
+    """
     print("Loading transcripts…")
     df = load_all_transcripts(transcript_data_dir)
 
@@ -180,6 +202,17 @@ def _load_and_embed(
 
 
 def _reduce_tsne(embeddings: np.ndarray, pca_pre: int = 50, seed: int = 42) -> np.ndarray:
+    """Reduce embeddings to 2-D using PCA pre-processing followed by t-SNE.
+
+    Inputs:
+        embeddings: Float array of shape ``(n_chunks, embedding_dim)``.
+        pca_pre:    Number of PCA components to compute before t-SNE.
+                    Clamped to ``min(pca_pre, embedding_dim, n_chunks - 1)``.
+        seed:       Random seed for PCA and t-SNE.
+
+    Outputs:
+        Float array of shape ``(n_chunks, 2)`` with t-SNE 2-D coordinates.
+    """
     n_pre = min(pca_pre, embeddings.shape[1], embeddings.shape[0] - 1)
     print(f"PCA → {n_pre}D  (t-SNE pre-processing)…")
     reduced = PCA(n_components=n_pre, random_state=seed).fit_transform(embeddings)
@@ -205,6 +238,19 @@ def plot_binary_labels(
     output_path: Path,
     seed: int,
 ) -> None:
+    """Scatter plot of all chunks colored red (non-hit) or green (research hit).
+
+    Inputs:
+        coords:      2-D t-SNE coordinates, shape ``(n_chunks, 2)``.
+        labels:      Binary label array, shape ``(n_chunks,)``.
+        n_chunks:    Total chunk count (used in the title).
+        n_pos:       Positive chunk count (used in the title).
+        output_path: Destination PNG path.
+        seed:        Random seed shown in the title for reproducibility reference.
+
+    Outputs:
+        None — saves PNG to output_path.
+    """
     fig, ax = plt.subplots(figsize=(9, 7))
     fig.patch.set_facecolor(WHITE)
     ax.set_facecolor(LIGHT)
@@ -253,7 +299,20 @@ def plot_by_district(
     output_path: Path,
     seed: int,
 ) -> None:
-    """Color points by district; use ● for negatives and ★ for positives."""
+    """Scatter plot colored by school district; ● for non-hits, ★ for research hits.
+
+    Inputs:
+        coords:      2-D t-SNE coordinates, shape ``(n_chunks, 2)``.
+        labels:      Binary label array, shape ``(n_chunks,)``.
+        df:          Combined chunk DataFrame with a ``transcript_id`` column.
+        n_chunks:    Total chunk count (used in the title).
+        n_pos:       Positive chunk count (used in the title).
+        output_path: Destination PNG path.
+        seed:        Random seed shown in the title for reproducibility reference.
+
+    Outputs:
+        None — saves PNG to output_path.
+    """
 
     df = df.copy()
     df["_district"] = df["transcript_id"].apply(extract_district)
@@ -340,11 +399,21 @@ def _cluster_positives(
     min_cluster_size: int = 8,
     min_samples: int | None = None,
 ) -> np.ndarray:
-    """Cluster positive points in 2-D t-SNE space.
+    """Cluster positive chunks in 2-D t-SNE space using HDBSCAN or DBSCAN.
 
-    Tries hdbscan first; falls back to DBSCAN if unavailable.
+    Tries hdbscan first; falls back to sklearn DBSCAN if hdbscan is not installed.
 
-    Returns an int array of cluster labels (-1 = noise).
+    Inputs:
+        pos_coords:       2-D coordinates of positive-class chunks only,
+                          shape ``(n_positives, 2)``.
+        min_cluster_size: Minimum cluster size for HDBSCAN / DBSCAN.
+                          Lower values produce more, smaller clusters.
+        min_samples:      HDBSCAN min_samples parameter. Defaults to
+                          ``max(3, min_cluster_size // 3)``.
+
+    Outputs:
+        Int array of shape ``(n_positives,)`` with cluster labels.
+        ``-1`` indicates noise (point not assigned to any cluster).
     """
     try:
         import hdbscan
@@ -379,7 +448,21 @@ def _confidence_ellipse(
     alpha: float = 0.18,
     lw: float = 1.8,
 ) -> None:
-    """Draw a covariance ellipse around points (x, y)."""
+    """Draw a covariance ellipse enclosing points (x, y) on a matplotlib Axes.
+
+    Inputs:
+        x:     X-coordinates of the points to enclose.
+        y:     Y-coordinates of the points to enclose.
+        ax:    Matplotlib Axes to draw on.
+        n_std: Radius of the ellipse in units of standard deviations.
+               2.0 ≈ 95% confidence interval for a bivariate normal.
+        color: Fill and edge color of the ellipse (hex string or named color).
+        alpha: Transparency of the filled ellipse body.
+        lw:    Line width of the ellipse edge.
+
+    Outputs:
+        None — draws the ellipse patch directly onto ax.
+    """
     if len(x) < 2:
         return
     cov    = np.cov(x, y)
@@ -421,7 +504,26 @@ def plot_positive_neighborhoods(
     output_csv: Path,
     label_context_window: int = 2,
 ) -> None:
-    """Scatter only positives, color by HDBSCAN cluster, draw ellipses."""
+    """Scatter positive chunks colored by HDBSCAN cluster, with ellipses and a CSV.
+
+    Inputs:
+        coords:              2-D t-SNE coordinates for all chunks, shape ``(n_chunks, 2)``.
+        labels:              Binary label array, shape ``(n_chunks,)``.
+        df:                  Combined chunk DataFrame (used for transcript_id, chunk_id, text).
+        min_cluster_size:    Minimum cluster size passed to ``_cluster_positives``.
+        output_plot:         Destination PNG path for the scatter plot.
+        output_csv:          Destination CSV path for the per-positive neighborhood table.
+        label_context_window: Context window used when loading ``df``; stored in the CSV
+                              for reference but does not change the embeddings.
+
+    Outputs:
+        None — saves PNG to output_plot and CSV to output_csv; also prints a
+        per-neighborhood text summary to stdout.
+
+    Side effects:
+        Returns ``(cluster_labels, cluster_name)`` as a tuple so the caller can
+        pass them to subsequent plots that overlay neighborhood ellipses.
+    """
 
     pos_mask   = labels == 1
     pos_coords = coords[pos_mask]
@@ -544,7 +646,16 @@ def plot_positive_neighborhoods(
 
 
 def _print_neighborhood_summary(pos_df: pd.DataFrame, cluster_name: dict) -> None:
-    """Print a readable per-neighbourhood breakdown to stdout."""
+    """Print a readable per-neighbourhood breakdown to stdout.
+
+    Inputs:
+        pos_df:       DataFrame of positive chunks with ``neighborhood_label``,
+                      ``transcript_id``, ``chunk_id``, and ``text`` columns.
+        cluster_name: Dict mapping integer cluster ID → letter label (e.g. ``{0: "A"}``).
+
+    Outputs:
+        None — prints to stdout.
+    """
     print("\n" + "=" * 70)
     print("NEIGHBOURHOOD SUMMARY")
     print("=" * 70)
@@ -579,12 +690,28 @@ def plot_neighborhoods_with_negatives(
     output_path: Path,
     output_csv: Path,
 ) -> None:
-    """Full dataset: points colored by district, ●=non-hit ★=hit, neighbourhood ellipses.
+    """Full dataset scatter with district colors, neighborhood ellipses, and a full CSV.
 
-    - Every point (pos and neg) is colored by its school district.
-    - Shape encodes label: circles for non-hits, stars for research hits.
-    - Neighbourhood ellipses and letter labels are drawn over the positives.
-    - No legend (district colors are already visible in tsne_by_district.png).
+    Every point is colored by its school district. Shape encodes label: circles
+    for non-hits, stars for research hits. Neighborhood ellipses and letter labels
+    are drawn over the positives.
+
+    Inputs:
+        coords:         2-D t-SNE coordinates for all chunks, shape ``(n_chunks, 2)``.
+        labels:         Binary label array, shape ``(n_chunks,)``.
+        cluster_labels: Cluster assignments for positive chunks only,
+                        shape ``(n_positives,)``.
+        cluster_name:   Dict mapping cluster int ID → letter label.
+        df:             Combined chunk DataFrame with ``transcript_id`` column.
+        n_chunks:       Total chunk count (used in the title).
+        n_pos:          Positive chunk count (used in the title).
+        output_path:    Destination PNG path for the scatter plot.
+        output_csv:     Destination CSV path; one row per chunk with
+                        neighborhood_label, transcript_id, chunk_id, binary_hit,
+                        tsne coordinates, and text.
+
+    Outputs:
+        None — saves PNG to output_path and CSV to output_csv.
     """
     pos_mask   = labels == 1
     neg_mask   = labels == 0
@@ -704,6 +831,13 @@ def save_district_legend(df: pd.DataFrame, output_path: Path) -> None:
 
     Includes one swatch per district plus a shape key (● non-hit, ★ hit).
     Sized to fit the content — no wasted whitespace.
+
+    Inputs:
+        df:          Combined chunk DataFrame with a ``transcript_id`` column.
+        output_path: Destination PNG path.
+
+    Outputs:
+        None — saves PNG to output_path.
     """
     districts  = sorted(df["transcript_id"].apply(extract_district).unique())
     n_districts = len(districts)
@@ -778,7 +912,17 @@ def save_neighborhood_legend(
     cluster_name: dict,
     output_path: Path,
 ) -> None:
-    """Standalone PNG: top-5 neighborhoods by positive count, descending."""
+    """Save a standalone PNG card showing the top-5 neighborhoods by positive count.
+
+    Inputs:
+        cluster_labels: Cluster assignments for positive chunks, shape ``(n_positives,)``.
+                        ``-1`` indicates noise.
+        cluster_name:   Dict mapping cluster int ID → letter label (e.g. ``{0: "A"}``).
+        output_path:    Destination PNG path.
+
+    Outputs:
+        None — saves PNG to output_path.
+    """
     TOP5_COLORS = ["#EC4899", "#8B5CF6", "#EF4444", "#F59E0B", "#0D9488"]
 
     unique_clusters = sorted(c for c in set(cluster_labels) if c != -1)
@@ -927,6 +1071,12 @@ def _build_transcript_colormap(df: pd.DataFrame) -> dict[str, tuple]:
 
     Draws from tab20 → tab20b → tab20c in sequence (up to 60 distinct
     colours) so even a dataset with ~50 transcripts gets a unique swatch.
+
+    Inputs:
+        df: Combined chunk DataFrame with a ``transcript_id`` column.
+
+    Outputs:
+        Dict mapping each unique transcript_id string to an RGBA 4-tuple.
     """
     transcripts = sorted(df["transcript_id"].unique())
     palette: list = []
@@ -937,10 +1087,16 @@ def _build_transcript_colormap(df: pd.DataFrame) -> dict[str, tuple]:
 
 
 def _short_transcript_name(transcript_id: str) -> str:
-    """Strip leading district token and replace underscores with spaces.
+    """Strip leading district tokens and return a readable short name.
 
-    'Katy_ISD_2023_03_Board_Meeting' → '2023 03 Board Meeting'
-    Truncates to 38 chars so it fits a legend column.
+    ``'Katy_ISD_2023_03_Board_Meeting'`` → ``'2023 03 Board Meeting'``
+    Truncates to 38 characters so it fits a legend column.
+
+    Inputs:
+        transcript_id: Full transcript identifier string (filename stem).
+
+    Outputs:
+        Shortened display string with district tokens removed.
     """
     parts = transcript_id.split("_")
     # Drop tokens that match known district name fragments
@@ -967,11 +1123,27 @@ def plot_neighborhoods_by_transcript(
     n_pos: int,
     output_path: Path,
 ) -> None:
-    """Full dataset t-SNE with each point colored by its transcript.
+    """Full dataset t-SNE with each point colored by its individual transcript.
 
-    Neighbourhood ellipses and letter labels are drawn over the positives,
-    identical to plot_neighborhoods_with_negatives, but the color dimension
-    now encodes individual transcript rather than district.
+    Neighborhood ellipses and letter labels are drawn over the positives,
+    identical to ``plot_neighborhoods_with_negatives``, but color encodes
+    individual transcript rather than district.
+
+    Inputs:
+        coords:           2-D t-SNE coordinates for all chunks, shape ``(n_chunks, 2)``.
+        labels:           Binary label array, shape ``(n_chunks,)``.
+        cluster_labels:   Cluster assignments for positive chunks only,
+                          shape ``(n_positives,)``.
+        cluster_name:     Dict mapping cluster int ID → letter label.
+        df:               Combined chunk DataFrame with ``transcript_id`` column.
+        transcript_color: Dict mapping transcript_id → RGBA colour tuple (from
+                          ``_build_transcript_colormap``).
+        n_chunks:         Total chunk count (used in the title).
+        n_pos:            Positive chunk count (used in the title).
+        output_path:      Destination PNG path.
+
+    Outputs:
+        None — saves PNG to output_path.
     """
     pos_mask   = labels == 1
     neg_mask   = labels == 0
@@ -1058,11 +1230,20 @@ def save_transcript_legend(
     transcript_color: dict,
     output_path: Path,
 ) -> None:
-    """Standalone legend PNG mapping each transcript to its colour.
+    """Save a standalone legend PNG mapping each transcript to its colour.
 
     Transcripts are grouped by district, with a bold section header per
-    district.  Within each district the entries are split into two columns
-    so the card stays compact even with ~50 transcripts.
+    district. Within each district entries are split into two columns so
+    the card stays compact even with ~50 transcripts.
+
+    Inputs:
+        df:               Combined chunk DataFrame with a ``transcript_id`` column.
+        transcript_color: Dict mapping transcript_id → RGBA colour tuple (from
+                          ``_build_transcript_colormap``).
+        output_path:      Destination PNG path.
+
+    Outputs:
+        None — saves PNG to output_path.
     """
     # Group transcripts by district, sorted
     df2 = df[["transcript_id"]].copy()
@@ -1213,6 +1394,24 @@ def save_transcript_legend(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """Parse CLI arguments and run the full extended t-SNE visualization pipeline.
+
+    Inputs:
+        --transcript-data-dir:    Directory containing transcript CSV files (required).
+        --output-dir:             Directory to write all PNG and CSV outputs (default: plots/).
+        --seed:                   Random seed for PCA / t-SNE (default: 42).
+        --context-window:         Label context window size in chunks (default: 2).
+        --hdbscan-min-cluster-size: Minimum cluster size for HDBSCAN (default: 8).
+
+    Outputs:
+        None — writes the following files to --output-dir:
+            full_dataset_tsne.png, tsne_by_district.png,
+            tsne_positive_neighborhoods.png, positive_neighborhoods.csv,
+            tsne_neighborhoods_with_negatives.png, all_chunks_neighborhoods.csv,
+            tsne_neighborhoods_by_transcript.png,
+            legend_district_colors.png, legend_neighborhoods.png,
+            legend_transcripts.png.
+    """
     parser = argparse.ArgumentParser(
         description="Extended t-SNE plots: district coloring + positive neighbourhoods."
     )

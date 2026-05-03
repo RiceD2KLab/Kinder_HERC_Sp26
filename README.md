@@ -42,11 +42,13 @@ Kinder_HERC_Sp26/
 │   │   ├── config.py             # Pipeline configuration dataclasses
 │   │   ├── data_utils.py         # Data loading and transcript-level splitting
 │   │   ├── embedding_utils.py    # Sentence embedding and feature construction
-│   │   ├── modeling.py           # Logistic regression training and evaluation
-│   │   ├── pipeline.py           # End-to-end pipeline orchestration
+│   │   ├── modeling.py           # Model training, threshold selection, evaluation
+│   │   ├── pipeline.py           # Single train/val/test run + CLI
+│   │   ├── cv_pipeline.py        # Grouped K-Fold cross-validation + CLI
+│   │   ├── run_experiments.py    # Multi-seed experiment driver + aggregation
 │   │   ├── analyze_errors.py     # False positive/negative error analysis
-│   │   ├── outputs/              # Pipeline output CSVs and JSON
-│   │   └── plots/                # Visualization scripts and PNG outputs
+│   │   ├── outputs/              # Pipeline output CSVs, JSON, and plots
+│   │   └── results_visualization_scripts/  # t-SNE, PR curve, fold embedding plots
 │   ├── Transcript Data/          # Labeled CSV files (one per meeting)
 │   └── requirements.txt
 ├── requirements.txt            # All Python dependencies (combined)
@@ -160,35 +162,51 @@ See [transcript_chunking/README.md](transcript_chunking/README.md) for options.
 
 ### Step 5: Label transcripts and train the classifier
 
-The labeled transcript CSVs in `research_labeling/Transcript Data/` are used as training data. To run the classification pipeline:
+The labeled transcript CSVs in `research_labeling/Transcript Data/` are used as training data. To run a single experiment:
 
 ```bash
 cd research_labeling/research_chunk_pipeline
 python pipeline.py --transcript-data-dir "../Transcript Data"
 ```
 
-**Output:** Predictions, metrics, and error analysis in `outputs/`:
-
-```
-outputs/
-├── all_transcript_predictions.csv       # Predictions for every chunk
-├── false_positives.csv                  # Incorrectly flagged chunks
-├── false_negatives.csv                  # Missed research mentions
-├── test_predictions.csv                 # Test-set predictions only
-├── metrics_summary.json                 # Key metrics (recall, precision, F2, etc.)
-├── transcript_split_assignments.csv     # Per-transcript split assignments
-└── validation_threshold_sweep.csv       # Threshold sweep results
-```
-
-To generate evaluation plots:
+To reproduce the full multi-seed experiments from the report:
 
 ```bash
-cd plots
-python visualize_results.py   # confusion matrix, threshold sweep, metrics bar chart
-python graphic.py             # dataset distribution chart
+# Baseline (no feature selection), 10 seeds
+python run_experiments.py \
+    --experiment-name no_feature_selection \
+    --transcript-data-dir "../Transcript Data" \
+    --seeds 1 2 3 4 5 6 7 8 9 10
 ```
 
-See [research_labeling/README.md](research_labeling/README.md) for detailed documentation.
+**Output:** Predictions, metrics, error analysis, and aggregate plots written under `outputs/<experiment_name>/`:
+
+```
+outputs/no_feature_selection/
+├── seed_1/
+│   ├── cv_results.json
+│   ├── fold_1_test_predictions.csv
+│   ├── fold_1_false_positives.csv
+│   └── fold_1_false_negatives.csv
+├── seed_2/ ...
+└── aggregate/
+    ├── all_fold_results.csv
+    ├── aggregate_summary.json
+    ├── metrics_barchart.png
+    ├── threshold_frequency.png
+    └── confusion_matrix.png
+```
+
+To generate embedding visualizations:
+
+```bash
+cd results_visualization_scripts
+python plot_embeddings_extended.py --transcript-data-dir "../../Transcript Data"
+python plot_pr_curve.py --experiment-dirs "../outputs/no_feature_selection" \
+    --output-path "../plots/pr_curve.png"
+```
+
+See [research_labeling/README.md](research_labeling/README.md) for complete documentation of all scripts and options.
 
 ## Data
 
@@ -214,14 +232,27 @@ To reproduce the classification results from the report:
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Run the pipeline (uses labeled CSVs already in the repo)
+# 2. Run multi-seed experiments (labeled CSVs already in the repo)
 cd research_labeling/research_chunk_pipeline
-python pipeline.py --transcript-data-dir "../Transcript Data"
 
-# 3. Generate evaluation plots
-cd plots
-python visualize_results.py
-python graphic.py
+python run_experiments.py \
+    --experiment-name no_feature_selection \
+    --transcript-data-dir "../Transcript Data" \
+    --seeds 1 2 3 4 5 6 7 8 9 10
+
+python run_experiments.py \
+    --experiment-name feature_selection_bic \
+    --transcript-data-dir "../Transcript Data" \
+    --seeds 1 2 3 4 5 6 7 8 9 10 \
+    --use-feature-selection --lasso-criterion bic
+
+# 3. Generate embedding visualizations
+cd results_visualization_scripts
+python plot_embeddings_extended.py --transcript-data-dir "../../Transcript Data"
+python plot_pr_curve.py \
+    --experiment-dirs "../outputs/no_feature_selection" "../outputs/feature_selection_bic" \
+    --labels "Baseline" "LASSO-BIC" \
+    --output-path "../plots/pr_curve_comparison.png"
 ```
 
-The pipeline uses fixed random seeds (`random_seed=42`) for deterministic train/val/test splitting and model training. Running the above commands will reproduce the metrics in `metrics_summary.json` and the plots in `plots/`.
+All random seeds are fixed for determinism. Running the above commands will reproduce the metrics in `aggregate_summary.json` and the plots under `outputs/<experiment_name>/aggregate/`.

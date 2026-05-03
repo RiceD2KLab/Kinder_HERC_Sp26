@@ -24,18 +24,15 @@ def analyze_errors(predictions_path: Path, output_dir: Path) -> None:
     Reads model predictions, separates incorrect classifications, writes
     each error type to its own CSV, and prints per-transcript breakdowns.
 
-    Inputs
-    ------
-    predictions_path : Path
-        Path to all_transcript_predictions.csv containing columns
-        ``predicted_label``, ``binary_hit``, and ``predicted_probability``.
-    output_dir : Path
-        Directory to write ``false_positives.csv`` and ``false_negatives.csv``.
+    Inputs:
+        predictions_path: Path to all_transcript_predictions.csv, which must
+                          contain ``predicted_label``, ``binary_hit``, and
+                          ``predicted_probability`` columns.
+        output_dir:       Directory to write ``false_positives.csv`` and
+                          ``false_negatives.csv``.
 
-    Outputs
-    -------
-    None
-        Results are written to disk and printed to stdout.
+    Outputs:
+        None — results are written to disk and printed to stdout.
     """
     df = pd.read_csv(predictions_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -92,18 +89,15 @@ def analyze_errors(predictions_path: Path, output_dir: Path) -> None:
 
 
 def main() -> None:
-    """Run error analysis from the command line.
+    """Parse CLI arguments and run error analysis.
 
-    Inputs
-    ------
-    sys.argv[1:] : parsed via argparse
-        --predictions : Path to all_transcript_predictions.csv (required).
-        --output-dir  : Directory for output CSVs (defaults to predictions dir).
+    Inputs:
+        --predictions: Path to all_transcript_predictions.csv (required).
+        --output-dir:  Directory for output CSVs (defaults to predictions directory).
 
-    Outputs
-    -------
-    None
-        Writes false_positives.csv and false_negatives.csv; prints summary to stdout.
+    Outputs:
+        None — writes false_positives.csv and false_negatives.csv;
+               prints per-transcript error breakdown to stdout.
     """
     parser = argparse.ArgumentParser(
         description="Analyze false positives and false negatives from model predictions."

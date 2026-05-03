@@ -78,7 +78,17 @@ class SplitConfig:
     stratify:       bool  = True
 
     def validate(self) -> None:
-        """Raise ValueError if the fractions do not sum to 1.0."""
+        """Raise ValueError if the fractions do not sum to 1.0.
+
+        Inputs:
+            None — reads self.train_fraction, self.val_fraction, self.test_fraction.
+
+        Outputs:
+            None — raises on invalid configuration.
+
+        Raises:
+            ValueError: If the three fractions do not sum to 1.0.
+        """
         total = self.train_fraction + self.val_fraction + self.test_fraction
         if abs(total - 1.0) > 1e-9:
             raise ValueError(
@@ -250,6 +260,12 @@ class PipelineConfig:
 
     def validate(self) -> None:
         """Check configuration consistency before starting a pipeline run.
+
+        Inputs:
+            None — reads all sub-config fields from self.
+
+        Outputs:
+            None — raises on invalid configuration.
 
         Raises:
             FileNotFoundError: If ``transcript_data_dir`` does not exist.

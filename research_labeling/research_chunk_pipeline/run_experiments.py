@@ -235,6 +235,19 @@ def _plot_frequencies(
         color: str,
         filename: str,
     ) -> dict[str, Any]:
+        """Plot a frequency bar chart for a single numeric series.
+
+        Inputs:
+            series:   Numeric Series whose values to count (e.g. thresholds or C values).
+            title:    Chart title string.
+            xlabel:   X-axis label string.
+            color:    Bar fill color (hex string).
+            filename: Output PNG filename written to output_dir.
+
+        Outputs:
+            Dict with keys ``counts`` (value → count), ``mean``, and ``median``
+            of the raw series values.
+        """
         counts     = series.value_counts().sort_index()
         raw_values = series.astype(float)
         mean_val   = float(raw_values.mean())
@@ -585,6 +598,7 @@ def run_experiments(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def _build_argument_parser() -> argparse.ArgumentParser:
+    """Define all command-line arguments for the experiment driver."""
     parser = argparse.ArgumentParser(
         description=(
             "Run the grouped K-fold CV pipeline over multiple seeds and "
@@ -724,6 +738,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Parse CLI arguments and run the multi-seed experiment driver."""
     args = _build_argument_parser().parse_args()
 
     if not args.transcript_data_dir.exists():

@@ -74,7 +74,14 @@ class SplitMetrics:
     actual_positive_count:   int
 
     def to_dict(self) -> dict[str, float | int]:
-        """Return a JSON-serialisable dict representation."""
+        """Return a JSON-serialisable dict representation.
+
+        Inputs:
+            None — serialises all fields from self.
+
+        Outputs:
+            Dict mapping each field name to its value (floats and ints only).
+        """
         return asdict(self)
 
 
