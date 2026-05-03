@@ -153,6 +153,23 @@ def chunk_by_time(segments: list[dict], window_seconds: int) -> list[dict]:
     return chunks
 
 
+def chunk_transcript(input_path: Path, output_path: Path, chunk_minutes: int):
+    text = input_path.read_text(encoding="utf-8")
+    segments = parse_segments(text)
+    window_seconds = chunk_minutes * 60
+    chunks = chunk_by_time(segments, window_seconds)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["chunk_id", "window_start", "window_end", "text"])
+        for ch in chunks:
+            writer.writerow([ch["chunk_id"], ch["window_start"], ch["window_end"], ch["text"]])
+
+    return f"Saved {len(chunks)} chunks to {output_path}"
+
+
+
 def main():
     """Parse CLI arguments, chunk the transcript, and write the output CSV.
 
@@ -186,21 +203,8 @@ def main():
         help="Duration of each chunk in minutes (default: 2).",
     )
     args = parser.parse_args()
-
-    text = args.input.read_text(encoding="utf-8")
-
-    segments = parse_segments(text)
-    window_seconds = args.chunk_minutes * 60
-    chunks = chunk_by_time(segments, window_seconds)
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["chunk_id", "window_start", "window_end", "text"])
-        for ch in chunks:
-            writer.writerow([ch["chunk_id"], ch["window_start"], ch["window_end"], ch["text"]])
-
-    print(f"Saved {len(chunks)} chunks to {args.output}")
+    final_message = chunk_transcript(args.input, args.output, args.chunk_minutes)
+    print(final_message)
 
 
 if __name__ == "__main__":

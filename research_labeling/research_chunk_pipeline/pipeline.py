@@ -31,6 +31,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import joblib
 
 from config import PipelineConfig
 from data_utils import (
@@ -435,6 +436,21 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
             "test_transcripts":     int((split_assignments["split"] == "test").sum()),
         },
     }
+
+    #saving important model for app
+    
+    artifacts = {
+        "model":           selection.model,
+        "threshold":       selection.best_threshold,
+        "feature_mode":    config.embedding.feature_mode,
+        "query_text":      config.embedding.query_text,
+        "query_embedding": query_embedding,   # None if chunk_only mode
+        "embedding_model": config.embedding.model_name,
+    }
+    joblib.dump(artifacts, config.output.output_dir / "inference_artifacts.pkl")
+    print("Saved inference_artifacts.pkl")
+
+
 
     metrics_path = config.output.output_dir / config.output.metrics_filename
     with open(metrics_path, "w", encoding="utf-8") as fh:
