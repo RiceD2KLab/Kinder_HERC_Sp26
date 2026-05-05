@@ -1,21 +1,29 @@
 # Web Scraping
-yt-dlp
-requests
-beautifulsoup4
-lxml
-tqdm
+yt-dlp==2026.3.17
+requests==2.33.1
+beautifulsoup4==4.14.3
+lxml==6.1.0
+tqdm==4.67.3
 
 # Transcription
-nemo_toolkit[asr]
+nemo_toolkit[asr]==2.7.3
 
 # Research Labeling
-sentence-transformers
-scikit-learn
-pandas
-numpy
-matplotlib
+sentence-transformers==5.3.0
+scikit-learn==1.8.0
+pandas==3.0.2
+numpy==2.4.4
+matplotlib==3.10.8
+xgboost==3.2.0
+joblib==1.5.3
+hdbscan==0.8.42
 
 # Word Error Rate
-jiwer
-contractions
-num2words
+jiwer==4.0.0
+contractions==0.1.73
+num2words==0.5.14
+
+# App
+customtkinter==5.2.2
+pydub==0.25.1
+python-docx==1.2.0

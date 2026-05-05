@@ -1,5 +1,5 @@
-yt-dlp
-requests
-beautifulsoup4
-lxml
-tqdm
+yt-dlp==2026.3.17
+requests==2.33.1
+beautifulsoup4==4.14.3
+lxml==6.1.0
+tqdm==4.67.3

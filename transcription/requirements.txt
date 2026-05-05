@@ -1,1 +1,1 @@
-nemo_toolkit[asr]
+nemo_toolkit[asr]==2.7.3
