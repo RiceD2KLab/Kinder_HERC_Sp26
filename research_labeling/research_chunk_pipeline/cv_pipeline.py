@@ -85,6 +85,7 @@ def _build_feature_matrix(
         texts=combined_df["model_text"].astype(str).tolist(),
         batch_size=config.embedding.batch_size,
         normalize_embeddings=config.embedding.normalize_embeddings,
+        truncate=config.embedding.truncate_embeddings,
     )
 
     if config.embedding.feature_mode == "chunk_only":

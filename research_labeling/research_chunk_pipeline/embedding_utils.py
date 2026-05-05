@@ -141,31 +141,57 @@ def encode_texts(
     normalize_embeddings: bool = True,
     max_tokens: int = 512,
     stride: int = 256,
+    truncate: bool = True,
 ) -> np.ndarray:
     """Encode a list of strings into a 2-D embedding matrix.
 
-    Texts within the model's token limit are encoded in fast batched mode.
-    Texts exceeding ``max_tokens`` tokens are handled via chunk-and-pool:
-    split into overlapping windows, embed each, average the results.
+    Two strategies are available for texts that exceed ``max_tokens`` tokens:
+
+    truncate (default)
+        All texts are passed directly to the model in one batched call.
+        The sentence-transformers library silently drops tokens beyond
+        ``max_tokens``, so only the first 512 tokens of each chunk are
+        represented.  Fast and deterministic.
+
+    chunk-and-pool (``truncate=False``)
+        Oversized texts are split into overlapping windows of ``max_tokens``
+        tokens with a step size of ``stride`` tokens.  Each window is embedded
+        independently and the resulting vectors are averaged.  Captures the
+        full text but is slower and changes the embedding space relative to
+        the truncation path.
 
     Inputs:
         model:                Loaded sentence-transformer model.
         texts:                Input strings to encode.
-        batch_size:           Number of strings processed per forward pass
-                              (applies to the normal batched path only).
+        batch_size:           Number of strings processed per forward pass.
         normalize_embeddings: If True, each row is L2-normalised to unit length.
-        max_tokens:           Token limit above which chunk-and-pool is used.
-                              Defaults to 512 (MPNet's hard limit).
+        max_tokens:           Token limit above which the long-text strategy
+                              applies.  Defaults to 512 (MPNet's hard limit).
         stride:               Step size in tokens between chunk-and-pool windows.
-                              Smaller stride = more overlap = slower but
-                              smoother coverage.  Default: 256 (50% overlap).
+                              Only used when ``truncate=False``.
+                              Default: 256 (50% overlap).
+        truncate:             If True (default), let the model truncate oversized
+                              texts at ``max_tokens``.  If False, use chunk-and-pool
+                              to average overlapping windows instead.
 
     Outputs:
         Float32 NumPy array of shape ``(len(texts), embedding_dim)``.
     """
+    if truncate:
+        # Fast path: encode everything in one batched call.
+        # Sentence-transformers truncates silently at model.max_seq_length (512).
+        result = model.encode(
+            [str(t) for t in texts],
+            batch_size=batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=normalize_embeddings,
+            show_progress_bar=True,
+        )
+        return np.asarray(result, dtype=np.float32)
+
+    # Chunk-and-pool path: split oversized texts into overlapping windows.
     tokenizer = model.tokenizer
 
-    # Partition texts into normal (≤ max_tokens) and long (> max_tokens).
     normal_indices: list[int] = []
     long_indices:   list[int] = []
 
@@ -183,7 +209,6 @@ def encode_texts(
         )
 
     # Allocate output matrix.
-    # Embed one normal text to get the embedding dimension.
     sample_text = texts[normal_indices[0]] if normal_indices else texts[long_indices[0]]
     sample_emb  = model.encode(
         str(sample_text),

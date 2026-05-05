@@ -1,0 +1,50 @@
+transcript_id,n_chunks,n_positive,positive_rate,split
+RELABEL_Chunk_Houston_ISD-2025-02-27-Special_Board_Meeting - Chunk_Houston_ISD-2025-02-27-Special_Board_Meeting,121,65,0.5371900826446281,train
+RELABEL_Houston_ISD-2025-06-12-Board_Meetings - Houston_ISD-2025-06-12-Board_Meetings,115,42,0.3652173913043478,train
+RELABEL_Houston_ISD-2024-09-12-Board_Meetings - Houston_ISD-2024-09-12-Board_Meetings,126,41,0.3253968253968254,train
+RELABEL_Houston_ISD-2025-05-08-Board_Meetings - Houston_ISD-2025-05-08-Board_Meetings,104,36,0.34615384615384615,train
+RELABEL_Houston_ISD-2024-12-10-Board_Meetings - Houston_ISD-2024-12-10-Board_Meetings,144,36,0.25,train
+RELABEL_Houston_ISD-2025-03-20-Board_Meetings - Houston_ISD-2025-03-20-Board_Meetings,81,30,0.37037037037037035,train
+RELABEL_Houston_ISD-2024-11-14-Board_Meetings - Houston_ISD-2024-11-14-Board_Meetings,139,29,0.20863309352517986,train
+RELABEL_Houston_ISD-2025-08-14-Board_Meetings - Chunk_Houston_ISD-2025-08-14-Board_Meetings,83,27,0.3253012048192771,train
+RELABEL Chunk_Houston_ISD-2025-12-11-Board_Meetings - Chunk_Houston_ISD-2025-12-11-Board_Meetings,79,26,0.3291139240506329,train
+RELABEL_Katy_ISD-2025-09-22-Board_Meetings - Katy_ISD-2025-09-22-Board_Meetings,124,22,0.1774193548387097,train
+RELABEL_Houston_ISD-2024-10-10-Board_Meetings - Chunk_Houston_ISD-2024-10-10-Board_Meetings,128,22,0.171875,train
+RELABEL_Houston_ISD-2025-09-11-Board_Meetings - Houston_ISD-2025-09-11-Board_Meetings,73,21,0.2876712328767123,train
+RELABEL_Houston_ISD-2025-10-09-Board_Meetings - Chunk_Houston_ISD-2025-10-09-Board_Meetings,84,20,0.23809523809523808,train
+RELABEL_Houston_ISD-2026-01-15-Board_Meetings - NEW_Copy of Houston_ISD-2026-01-15-Board_Meetings,106,19,0.1792452830188679,train
+RELABEL_Spring_Branch_ISD-2024-11-18-Board_Meetings - Spring_Branch_ISD-2024-11-18-Board_Meetings,58,18,0.3103448275862069,train
+RELABEL Spring_Branch_ISD-2025-03-24-Board_Meetings - Spring_Branch_ISD-2025-03-24-Board_Meetings,61,18,0.29508196721311475,train
+RELABEL_Katy_ISD-2025-12-08-Board_Meetings - Houston_ISD-2025-12-08-Board_Meetings,84,17,0.20238095238095238,train
+RELABEL_Spring_Branch_ISD-2024-10-21-Board_Meetings - Spring_Branch_ISD-2024-10-21-Board_Meetings,58,16,0.27586206896551724,train
+RELABEL_Chunk_Katy_ISD-2025-12-08-Board_Meetings - Chunk_Katy_ISD-2025-12-08-Board_Meetings,84,16,0.19047619047619047,train
+RELABEL_Katy_ISD-2024-10-28-Board_Meetings - Katy_ISD-2024-10-28-Board_Meetings,104,16,0.15384615384615385,train
+RELABEL Chunk_Katy_ISD-2024-12-09-Board_Meetings - Chunk_Katy_ISD-2024-12-09-Board_Meetings,70,15,0.21428571428571427,train
+RELABEL_Katy_ISD-2025-06-23-Board_Meetings - Katy_ISD-2025-06-23-Board_Meetings,101,14,0.13861386138613863,train
+RELABEL_Spring_Branch_ISD-2025-01-29-Board_Meetings - Spring_Branch_ISD-2025-01-29-Board_Meetings,89,12,0.1348314606741573,train
+RELABEL_Chunk_Katy_ISD-2025-07-28-Board_Meetings - Chunk_Katy_ISD-2025-07-28-Board_Meetings,90,12,0.13333333333333333,train
+RELABEL Spring_Branch_ISD-2025-12-15-Board_Meetings - Spring_Branch_ISD-2025-12-15-Board_Meetings,56,11,0.19642857142857142,train
+RELABEL_Chunk_Katy_ISD-2025-05-12-Board_Meetings - Chunk_Katy_ISD-2025-05-12-Board_Meetings,108,11,0.10185185185185185,train
+RELABEL_NEW_Copy of Katy_ISD-2025-10-27-Board_Meetings - NEW_Copy of Katy_ISD-2025-10-27-Board_Meetings,71,10,0.14084507042253522,train
+RELABEL_Houston_ISD-2025-01-16-Board_Meetings - Houston_ISD-2025-01-16-Board_Meetings,86,10,0.11627906976744186,train
+RELABEL Katy_ISD-2026-01-20-Board_Meetings - Chunk_Houston_ISD-2026-01-20-Board_Meetings,59,9,0.15254237288135594,train
+RELABEL_Chunk_Katy_ISD-2025-03-20-Special_Board_Meeting - Chunk_Katy_ISD-2025-03-20-Special_Board_Meeting,63,8,0.12698412698412698,train
+RELABEL_Chunk_Spring_Branch_ISD-2026-01-27-Board_Meetings - Chunk_Spring_Branch_ISD-2026-01-27-Board_Meetings,25,7,0.28,train
+RELABEL_Chunk_Spring_Branch_ISD-2024-09-23-Board_Meetings - Chunk_Spring_Branch_ISD-2024-09-23-Board_Meetings,31,7,0.22580645161290322,train
+RELABEL_ Katy_ISD-2025-02-24-Board_Meetings - NEW_Copy of Katy_ISD-2025-02-24-Board_Meetings,78,6,0.07692307692307693,train
+RELABEL Spring_Branch_ISD-2025-08-25-Board_Meetings - Spring_Branch_ISD-2025-08-25-Board_Meetings,23,5,0.21739130434782608,train
+RELABEL_Katy_ISD-2025-04-22-Board_Meetings - Katy_ISD-2025-04-22-Board_Meetings,54,5,0.09259259259259259,train
+RELABEL Spring_Branch_ISD-2025-06-23-Board_Meetings - Spring_Branch_ISD-2025-06-23-Board_Meetings,21,4,0.19047619047619047,train
+RELABEL_Katy_ISD-2025-08-25-Board_Meetings - Katy_ISD-2025-08-25-Board_Meetings,68,4,0.058823529411764705,train
+RELABEL_NEW_Copy of Spring_Branch_ISD-2025-12-01-Special_Board_Meeting - NEW_Copy of Spring_Branch_ISD-2025-12-01-Special_Board_Meeting,71,4,0.056338028169014086,train
+RELABEL NEW2_Chunk_Houston_ISD-2024-11-19-Special_Board_Meeting - Chunk_Houston_ISD-2024-11-19-Special_Board_Meeting,10,3,0.3,train
+RELABEL_Chunk_Spring_Branch_ISD-2025-10-27-Board_Meetings - Chunk_Spring_Branch_ISD-2025-10-27-Board_Meetings,32,3,0.09375,train
+RELABEL_Katy_ISD-2025-03-31-Board_Meetings - Chunk_Katy_ISD-2025-03-31-Board_Meetings,106,3,0.02830188679245283,train
+RELABEL Spring_Branch_ISD-2025-05-27-Board_Meetings - Spring_Branch_ISD-2025-05-27-Board_Meetings,35,2,0.05714285714285714,train
+RELABEL_Katy_ISD-2024-09-23-Board_Meetings - Katy_ISD-2024-09-23-Board_Meetings,61,2,0.03278688524590164,train
+RELABEL Chunk_Spring_Branch_ISD-2024-12-13-Special_Board_Meetings - Chunk_Spring_Branch_ISD-2024-12-13-Special_Board_Meetings,62,2,0.03225806451612903,train
+RELABEL_Chunk_Spring_Branch_ISD-2025-12-01-Special_Board_Meetings - Chunk_Spring_Branch_ISD-2025-12-01-Special_Board_Meetings,71,2,0.028169014084507043,train
+RELABEL_Chunk_Spring_Branch_ISD-2025-01-23-Special_Board_Meetings - Chunk_Spring_Branch_ISD-2025-01-23-Special_Board_Meetings,20,1,0.05,train
+RELABEL NEW_Copy of Spring_Branch_ISD-2025-05-05-Special_Board_Meeting - NEW_Copy of Spring_Branch_ISD-2025-05-05-Special_Board_Meeting,25,1,0.04,train
+RELABEL_Spring_Branch_ISD-2024-08-26-Board_Meetings - Spring_Branch_ISD-2024-08-26-Board_Meetings,30,1,0.03333333333333333,train
+RELABEL_Chunk_Spring_Branch_ISD-2025-04-28-Board_Meetings - Chunk_Spring_Branch_ISD-2025-04-28-Board_Meetings,39,0,0.0,train

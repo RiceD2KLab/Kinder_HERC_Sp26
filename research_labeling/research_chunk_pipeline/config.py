@@ -114,6 +114,11 @@ class EmbeddingConfig:
                               doubling the feature dimension.
         query_text:           Guiding question used when feature_mode is
                               "query_conditioned".
+        truncate_embeddings:  If True (default), texts exceeding 512 tokens are
+                              silently truncated by the sentence-transformers
+                              library.  If False, oversized texts are split into
+                              overlapping 512-token windows, each embedded
+                              independently, and the results averaged (chunk-and-pool).
     """
 
     model_name:           str        = "sentence-transformers/all-mpnet-base-v2"
@@ -125,6 +130,7 @@ class EmbeddingConfig:
     query_text:           str        = (
         "How are research, data, reports, or studies used to make informed decisions?"
     )
+    truncate_embeddings:  bool       = True
 
 
 @dataclass(slots=True)

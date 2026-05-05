@@ -1,0 +1,48 @@
+{
+  "feature_mode": "chunk_only",
+  "query_text": null,
+  "best_c": 2.0,
+  "best_class_weight": "balanced",
+  "best_threshold": 0.35,
+  "feature_dimension": 768,
+  "chunk_embedding_dimension": 768,
+  "query_embedding_dimension": null,
+  "train_metrics": {
+    "threshold": 0.35,
+    "precision": 0.5048112509252406,
+    "recall": 0.9592123769338959,
+    "f1": 0.6614936954413191,
+    "f2": 0.8128724672228844,
+    "average_precision": 0.8307033104703263,
+    "true_negative": 2231,
+    "false_positive": 669,
+    "false_negative": 29,
+    "true_positive": 682,
+    "predicted_positive_count": 1351,
+    "actual_positive_count": 711
+  },
+  "validation_metrics": null,
+  "test_metrics": null,
+  "full_dataset_metrics": {
+    "threshold": 0.35,
+    "precision": 0.5048112509252406,
+    "recall": 0.9592123769338959,
+    "f1": 0.6614936954413191,
+    "f2": 0.8128724672228844,
+    "average_precision": 0.8307033104703263,
+    "true_negative": 2231,
+    "false_positive": 669,
+    "false_negative": 29,
+    "true_positive": 682,
+    "predicted_positive_count": 1351,
+    "actual_positive_count": 711
+  },
+  "dataset_summary": {
+    "n_total_chunks": 3611,
+    "n_total_positives": 711,
+    "n_transcripts": 49,
+    "train_transcripts": 49,
+    "val_transcripts": 0,
+    "test_transcripts": 0
+  }
+}
