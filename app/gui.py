@@ -19,17 +19,10 @@ import tkinter as tk
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 
-#hardcoding ffmpeg location
-_BIN_DIR = Path(__file__).resolve().parent.parent / "bin"
-FFMPEG_PATH = _BIN_DIR / "ffmpeg.exe"
-
-#adding this for Nemo not finding ffmpeg
-if _BIN_DIR.exists():
-    os.environ["PATH"] += os.pathsep + str(_BIN_DIR)
-
-from pydub import AudioSegment
-AudioSegment.converter = str(FFMPEG_PATH)
-AudioSegment.ffprobe = str(_BIN_DIR / "ffprobe.exe")
+import imageio_ffmpeg
+_ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+_ffmpeg_dir = str(Path(_ffmpeg_exe).parent)
+os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
 
 # ── Appearance ────────────────────────────────────────────────────────────────
@@ -340,23 +333,21 @@ class App(ctk.CTk):
             messagebox.showerror("Bad output path", str(e))
             return
  
-        ffmpeg_location = FFMPEG_PATH
- 
         self.run_btn.configure(state="disabled")
         self.retry_btn.pack_forget()
         self.open_btn.configure(state="disabled")
         self._result_dir = None
- 
+
         threading.Thread(
             target=self._run_pipeline,
-            args=(url, audio_paths, out_dir, district, ffmpeg_location),
+            args=(url, audio_paths, out_dir, district),
             daemon=True
         ).start()
    
 
 
 
-    def _run_pipeline(self, url: str | None, audio_paths, out_dir: Path, district: str, ffmpeg_location):
+    def _run_pipeline(self, url: str | None, audio_paths, out_dir: Path, district: str):
         try:
             with tempfile.TemporaryDirectory(prefix="transcript_") as tmp:
                 tmp_path = Path(tmp)
@@ -384,8 +375,7 @@ class App(ctk.CTk):
                         workers=8,
                         sources=[user_source],
                         out_path=scrape_dir,
-                        cutoff_str= "2024-09-01",
-                        ffmpeg_loc=Path(ffmpeg_location) if ffmpeg_location else None)
+                        cutoff_str= "2024-09-01")
                     
                     self.after(0, self._log, "Audio saved")
 

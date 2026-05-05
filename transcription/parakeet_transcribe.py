@@ -560,7 +560,7 @@ def is_audio_file(p: Path) -> bool:
 #############################################################################
 # Run Transcription -- Separates logic of transcribing the input file
 ############################################################################
-def run_transcription(input_path: Path, output_path: Path, model:str, no_highpass: bool = False,
+def run_transcription(input_path: Path, output_path: Path, model: str = "nvidia/parakeet-tdt-0.6b-v3", asr_model=None, no_highpass: bool = False,
     no_lowpass: bool = False,
     highpass_hz: int = 80,
     lowpass_hz: int = 7500,
@@ -587,12 +587,8 @@ def run_transcription(input_path: Path, output_path: Path, model:str, no_highpas
         print("No audio files found.")
         sys.exit(0)
 
-    # print(f"Loading model: {model}")
-    # if model is None:
-    #     print(f"Loading model: {model}")
-    #     asr_model = load_asr_model(model)
-    # print(f"Loading model: {model}")
-    asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=model)
+    if asr_model is None:
+        asr_model = load_asr_model(model)
 
     with tempfile.TemporaryDirectory(prefix="parakeet_tmp_") as tmp:
         tmp_dir = Path(tmp)
