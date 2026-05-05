@@ -54,3 +54,13 @@ A CSV with one row per chunk:
 1. **Parse** — Timestamp headers are extracted from the transcript using regex.
 2. **Group** — Consecutive sections are grouped into fixed-duration windows (default 2 minutes).
 3. **Write** — Each window becomes one row in the output CSV, with the section texts merged.
+
+## Batch Processing
+
+`mult_chunk.py` chunks every `.txt` transcript in a directory in a single run. Edit the `input_dir` and `output_dir` constants at the top of the file, then run:
+
+```bash
+python mult_chunk.py
+```
+
+One CSV is written to `output_dir` for each `.txt` file found in `input_dir`.

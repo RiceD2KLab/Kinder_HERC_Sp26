@@ -463,7 +463,19 @@ def run_cv(
 # ---------------------------------------------------------------------------
 
 def _build_argument_parser() -> argparse.ArgumentParser:
-    """Define all command-line arguments for the CV pipeline."""
+    """Define all command-line arguments for the CV pipeline.
+
+    Inputs
+    ------
+    None.
+
+    Outputs
+    -------
+    argparse.ArgumentParser
+        Configured parser covering transcript dir, output dir, number of folds,
+        validation fraction, seed, embedding mode, feature selection, and
+        model-type flags (logistic regression or XGBoost).
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Grouped K-Fold cross-validation for research-mention detection "
@@ -600,7 +612,17 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Parse CLI arguments, run cross-validation, and print the summary."""
+    """Parse CLI arguments, run grouped K-fold cross-validation, and print the summary.
+
+    Inputs
+    ------
+    None — reads from sys.argv (command-line arguments).
+
+    Outputs
+    -------
+    None — per-fold and aggregate metrics are printed to stdout and written
+           to ``cv_results.json`` in ``--output-dir`` by :func:`run_cv`.
+    """
     args = _build_argument_parser().parse_args()
 
     # Build a PipelineConfig reusing all the shared sub-configs.

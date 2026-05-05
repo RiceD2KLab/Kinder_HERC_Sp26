@@ -154,6 +154,24 @@ def chunk_by_time(segments: list[dict], window_seconds: int) -> list[dict]:
 
 
 def chunk_transcript(input_path: Path, output_path: Path, chunk_minutes: int):
+    """Read a timestamped transcript, group sections into chunks, and write a CSV.
+
+    Inputs
+    ------
+    input_path : Path
+        Path to a ``.txt`` transcript file with ``[MM:SS-MM:SS]`` or
+        ``[HH:MM:SS-HH:MM:SS]`` section headers.
+    output_path : Path
+        Destination path for the output CSV file.  Parent directories are
+        created automatically.
+    chunk_minutes : int
+        Duration of each output chunk in minutes.
+
+    Outputs
+    -------
+    str
+        Confirmation message: ``"Saved N chunks to <output_path>"``.
+    """
     text = input_path.read_text(encoding="utf-8")
     segments = parse_segments(text)
     window_seconds = chunk_minutes * 60

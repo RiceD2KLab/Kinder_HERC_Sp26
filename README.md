@@ -19,6 +19,14 @@ The goal is to identify segments of school board meetings where **research, data
 
 ```
 Kinder_HERC_Sp26/
+├── app/                        # Desktop GUI and Google Colab inference app
+│   ├── main.py                 # Entry point (run: python main.py or frozen exe)
+│   ├── gui.py                  # CustomTkinter GUI wiring all pipeline steps
+│   ├── highlighter.py          # Builds highlighted .docx from predictions
+│   ├── trained_model.py        # Inference wrapper: loads artifacts and scores chunks
+│   ├── colab_runner.py         # Google Colab entry point (run())
+│   ├── __init__.py
+│   └── requirements.txt
 ├── web_scraping/               # Download meeting videos from Swagit district pages
 │   ├── cli.py                  # Command-line entry point
 │   ├── config.py               # Constants, regex patterns, HTTP headers
@@ -36,7 +44,8 @@ Kinder_HERC_Sp26/
 │   ├── wer_norm.py             # Normalized WER calculation
 │   └── requirements.txt
 ├── transcript_chunking/        # Split transcripts into time-window chunks
-│   └── create_chunks.py        # Chunking script (standard library only)
+│   ├── create_chunks.py        # Chunking script (standard library only)
+│   └── mult_chunk.py           # Batch helper: chunks every .txt in a directory
 ├── research_labeling/          # Research-mention classification
 │   ├── research_chunk_pipeline/  # Core ML pipeline modules
 │   │   ├── config.py             # Pipeline configuration dataclasses
@@ -58,7 +67,7 @@ Kinder_HERC_Sp26/
 ## Installation
 
 **Prerequisites:**
-- Python 3.10+
+- Python 3.11.6
 - `ffmpeg` installed and available on PATH (required by web scraping and transcription)
 
 **Clone and set up a virtual environment:**
@@ -207,6 +216,31 @@ python plot_pr_curve.py --experiment-dirs "../outputs/no_feature_selection" \
 ```
 
 See [research_labeling/README.md](research_labeling/README.md) for complete documentation of all scripts and options.
+
+### App: Desktop GUI and Google Colab runner
+
+A pre-built graphical interface wraps all five pipeline steps into a single window.
+
+**Desktop (Windows/macOS/Linux):**
+
+```bash
+cd app
+pip install -r requirements.txt
+python main.py
+```
+
+Enter a district name and either a Swagit URL or local audio files, choose an output folder, and click **Run Pipeline**.  A highlighted `.docx` report is written to the output folder on completion.
+
+**Google Colab:**
+
+```python
+import sys
+sys.path.insert(0, "/content/Kinder_HERC_Sp26")
+from app.colab_runner import run
+run(url="https://...", district="Houston ISD", out_dir="/content/output")
+```
+
+See [app/README.md](app/README.md) for full usage instructions.
 
 ## Data
 

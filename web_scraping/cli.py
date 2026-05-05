@@ -247,6 +247,38 @@ def run_scraping_pipeline(
         cutoff_str: str = "2024-09-01",
         ffmpeg_loc: Path = None,
         ):
+    """Download audio from one or more school board meeting sources concurrently.
+
+    Builds a PipelineConfig, processes each source in a ThreadPoolExecutor,
+    and prints a success/failure summary to stdout.
+
+    Inputs
+    ------
+    frag_workers : int
+        Concurrent fragment download workers for segmented streams (HLS/DASH).
+    max_candidates : int
+        Maximum Swagit candidate links to attempt when scraping a page.
+    include_title : str
+        Regex pattern; only download videos whose title matches.
+    include_anchor_label : str
+        Regex pattern; for Swagit iframe anchors, only follow links whose
+        label text matches.
+    workers : int
+        Number of source threads to run concurrently.
+    sources : List[Source]
+        District + URL pairs to process.
+    out_path : Path
+        Root output directory (default: ``"School Board Meetings"``).
+    cutoff_str : str
+        ISO date string (YYYY-MM-DD); skip meetings older than this date.
+    ffmpeg_loc : Path or None
+        Path to the ffmpeg binary or its parent directory, if not on PATH.
+
+    Outputs
+    -------
+    None — WAV files are written to ``out_path/<district>/`` and a
+           success/failure summary is printed to stdout.
+    """
     # Parse cutoff date
     cutoff = datetime.strptime(cutoff_str, "%Y-%m-%d").date()
 

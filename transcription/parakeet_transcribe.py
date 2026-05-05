@@ -489,6 +489,19 @@ def plan_chunks(
 # Load asr model
 ############################################################################
 def load_asr_model(model: str = "nvidia/parakeet-tdt-0.6b-v3"):
+    """Download and load a NeMo ASR model by HuggingFace identifier.
+
+    Inputs
+    ------
+    model : str
+        NeMo model identifier (e.g. ``"nvidia/parakeet-tdt-0.6b-v3"``).
+
+    Outputs
+    -------
+    nemo_asr.models.ASRModel
+        Loaded ASR model ready for inference.  If CUDA is available the model
+        is placed on GPU automatically.
+    """
     print(f"Loading ASR Model: {model}")
     asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=model)
     print(f"Model loaded: {type(asr_model).__name__}")
@@ -560,7 +573,7 @@ def is_audio_file(p: Path) -> bool:
 #############################################################################
 # Run Transcription -- Separates logic of transcribing the input file
 ############################################################################
-def run_transcription(input_path: Path, output_path: Path, model: str = "nvidia/parakeet-tdt-0.6b-v3", asr_model=None, no_highpass: bool = False,
+def run_transcription(input_path: Path, output_path: Path, model: str = "nvidia/parakeet-tdt-0.6b-v3", asr_model=None, no_highpass: bool = False,  # noqa: E501
     no_lowpass: bool = False,
     highpass_hz: int = 80,
     lowpass_hz: int = 7500,
@@ -571,6 +584,53 @@ def run_transcription(input_path: Path, output_path: Path, model: str = "nvidia/
     wrap_width: int = 100,
     section_s: int = 30,
     no_sections: bool = False):
+    """Transcribe one audio file or an entire directory of audio files.
+
+    Preprocessing converts audio to mono 16 kHz PCM WAV with optional bandpass
+    filtering.  Long audio is split into overlapping chunks (~35 s with 1 s overlap),
+    each chunk is transcribed by the Parakeet model, and overlapping words at chunk
+    boundaries are deduplicated before the transcript is written to disk.
+
+    Inputs
+    ------
+    input_path : Path
+        Path to a single audio file or a directory of audio files.
+    output_path : Path
+        Directory where ``.txt`` transcripts are written (one per audio file).
+    model : str
+        NeMo model identifier, used only when ``asr_model`` is None.
+    asr_model : nemo_asr.models.ASRModel or None
+        Pre-loaded ASR model.  If None, ``load_asr_model(model)`` is called
+        automatically (slow — ~30 s on first call).
+    no_highpass : bool
+        Disable the 80 Hz high-pass filter.
+    no_lowpass : bool
+        Disable the 7500 Hz low-pass filter.
+    highpass_hz : int
+        High-pass filter cutoff in Hz (default 80).
+    lowpass_hz : int
+        Low-pass filter cutoff in Hz (default 7500).
+    chunk_s : float
+        Target chunk duration in seconds (default 35.0).
+    overlap_s : float
+        Overlap between consecutive chunks in seconds (default 1.0).
+    hour_block_s : float
+        Maximum audio block duration before hour-level splitting (default 3600.0).
+    batch_size : int
+        Number of chunks submitted to the model per transcription call (default 8).
+    wrap_width : int
+        Maximum characters per line in the output transcript (default 100).
+    section_s : int
+        Interval in seconds between ``[MM:SS–MM:SS]`` section headers (default 30).
+    no_sections : bool
+        If True, omit section headers and output plain wrapped text.
+
+    Outputs
+    -------
+    str or None
+        A confirmation message (``"Wrote transcript: <path>"``), or None if
+        the function exits early because no audio files were found.
+    """
     in_path = Path(input_path).expanduser().resolve()
     out_dir = Path(output_path).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)

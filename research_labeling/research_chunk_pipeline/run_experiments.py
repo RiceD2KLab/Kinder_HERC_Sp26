@@ -598,7 +598,18 @@ def run_experiments(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def _build_argument_parser() -> argparse.ArgumentParser:
-    """Define all command-line arguments for the experiment driver."""
+    """Define all command-line arguments for the multi-seed experiment driver.
+
+    Inputs
+    ------
+    None.
+
+    Outputs
+    -------
+    argparse.ArgumentParser
+        Configured parser covering experiment name, seeds list, base output dir,
+        transcript dir, and all cv_pipeline pass-through flags.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Run the grouped K-fold CV pipeline over multiple seeds and "
@@ -738,7 +749,17 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Parse CLI arguments and run the multi-seed experiment driver."""
+    """Parse CLI arguments and run the multi-seed experiment driver.
+
+    Inputs
+    ------
+    None — reads from sys.argv (command-line arguments).
+
+    Outputs
+    -------
+    None — per-seed CV results and aggregate artifacts are written under
+           ``<base_output_dir>/<experiment_name>/`` by :func:`run_experiments`.
+    """
     args = _build_argument_parser().parse_args()
 
     if not args.transcript_data_dir.exists():

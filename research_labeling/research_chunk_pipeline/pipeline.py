@@ -466,7 +466,18 @@ def run_pipeline(config: PipelineConfig) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _build_argument_parser() -> argparse.ArgumentParser:
-    """Define all command-line arguments for the pipeline."""
+    """Define all command-line arguments for the pipeline.
+
+    Inputs
+    ------
+    None.
+
+    Outputs
+    -------
+    argparse.ArgumentParser
+        Configured parser covering transcript dir, output dir, embedding mode,
+        split fractions, model hyperparameters, and manual-override flags.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Recall-first MPNet + logistic regression baseline for "
@@ -599,7 +610,17 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Parse CLI arguments, run the pipeline, and print the metrics summary."""
+    """Parse CLI arguments, build a PipelineConfig, run the pipeline, and print metrics.
+
+    Inputs
+    ------
+    None — reads from sys.argv (command-line arguments).
+
+    Outputs
+    -------
+    None — metrics JSON is printed to stdout and all artifacts are written
+           to ``--output-dir`` by :func:`run_pipeline`.
+    """
     args = _build_argument_parser().parse_args()
 
     config = PipelineConfig(transcript_data_dir=args.transcript_data_dir)

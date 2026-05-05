@@ -1,3 +1,11 @@
+"""Batch chunking helper — runs create_chunks.py on every transcript in a directory.
+
+Edit ``input_dir`` and ``output_dir`` at the top of this file before running.
+
+Usage:
+    python mult_chunk.py
+"""
+
 import os
 import subprocess
 from pathlib import Path
@@ -8,6 +16,21 @@ output_dir = Path("Kinder_HERC_Sp26/transcripts_to_label/chunked_transcripts") #
 chunk_script = "Kinder_HERC_Sp26/transcript_chunking/create_chunks.py"
 
 def run_batch():
+    """Chunk every ``.txt`` transcript in ``input_dir`` and write CSVs to ``output_dir``.
+
+    Calls ``create_chunks.py`` via subprocess for each file so the chunking
+    logic stays in one place and both tools remain usable independently.
+
+    Inputs
+    ------
+    None — reads the module-level ``input_dir``, ``output_dir``, and
+           ``chunk_script`` path constants.
+
+    Outputs
+    -------
+    None — one CSV per transcript is written to ``output_dir``.
+           Prints a progress line for each file processed.
+    """
     #loop through every .txt file in the input folder
     for txt_file in input_dir.glob("*.txt"):
         #create a matching CSV filename

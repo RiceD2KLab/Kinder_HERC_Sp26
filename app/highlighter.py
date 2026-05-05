@@ -20,6 +20,30 @@ def build_docx(
     district: str = "",
     video_url: str = "",
 ) -> Path:
+    """Build a highlighted Word document from model prediction results.
+
+    Each chunk is written as a timestamped paragraph.  Chunks where
+    ``predicted_label == 1`` are bolded and highlighted yellow.
+
+    Inputs
+    ------
+    predictions : List[Dict]
+        List of chunk dicts, each containing at minimum:
+        ``chunk_id``, ``window_start``, ``window_end``, ``text``,
+        and ``predicted_label`` (0 or 1).
+    output_path : Path
+        Destination path for the .docx file.  Parent directories are
+        created automatically.
+    district : str
+        District name written to the document header (optional).
+    video_url : str
+        Source URL written to the document header (optional).
+
+    Outputs
+    -------
+    Path
+        The path to the saved .docx file (same as ``output_path``).
+    """
     doc = Document()
 
     # Page: US Letter, 1-inch margins
@@ -72,6 +96,21 @@ def build_docx(
 
 
 def _bold_line(para, label, value):
+    """Append a bold label and plain value pair as runs to an existing paragraph.
+
+    Inputs
+    ------
+    para : docx.text.paragraph.Paragraph
+        The paragraph object to append runs to.
+    label : str
+        Bold prefix text (e.g. ``"District: "``).
+    value : str
+        Plain-text value appended after the label, followed by a newline.
+
+    Outputs
+    -------
+    None — mutates ``para`` in place.
+    """
     lb = para.add_run(label)
     lb.bold = True
     lb.font.size = Pt(10)
@@ -80,6 +119,19 @@ def _bold_line(para, label, value):
 
 
 def _shade(run, hex_fill):
+    """Apply an OOXML background-fill shading element to a run.
+
+    Inputs
+    ------
+    run : docx.text.run.Run
+        The run object to highlight.
+    hex_fill : str
+        Six-character hex color code without '#' (e.g. ``"FFFF99"`` for yellow).
+
+    Outputs
+    -------
+    None — mutates the run's underlying XML element.
+    """
     rPr = run._r.get_or_add_rPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:val"),   "clear")

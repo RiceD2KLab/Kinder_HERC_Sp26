@@ -33,6 +33,18 @@ AUDIO_EXTENSIONS = (
     ".wav", ".mp3", ".mp4", ".m4a", ".flac", ".ogg", ".aac", ".wma", ".opus"
 )
 def _collect_audio_files(paths: list) -> list:
+    """Recursively collect all audio files from a list of file and directory paths.
+
+    Inputs
+    ------
+    paths : list of Path
+        Mix of individual audio file paths and/or directories to search.
+
+    Outputs
+    -------
+    list of Path
+        All audio files found, sorted alphabetically.
+    """
     found = []
     for p in paths:
         if p.is_dir():
@@ -46,7 +58,16 @@ def _collect_audio_files(paths: list) -> list:
  
  
 class App(ctk.CTk):
+    """Main application window for the HERC Research Mention Finder.
+
+    Orchestrates the full pipeline: audio download or upload → Parakeet
+    transcription → 2-minute chunking → LR model inference → highlighted
+    .docx report.  All pipeline work runs on a background daemon thread so
+    the GUI stays responsive.
+    """
+
     def __init__(self):
+        """Initialize the application window and build the UI."""
         super().__init__()
         self.title("HERC Research Mention Finder")
         self.geometry("700x780")
@@ -59,6 +80,16 @@ class App(ctk.CTk):
  
     # ── UI ─────────────────────────────────────────────────────────────────────
     def _build_ui(self):
+        """Create and lay out all widgets: tab view, output dir, run/retry/open buttons, log box.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — mutates self, adding widget attributes used by other methods.
+        """
         ctk.CTkLabel(
             self, text="HERC Research Mention Finder",
             font=ctk.CTkFont(size=20, weight="bold")
@@ -210,6 +241,16 @@ class App(ctk.CTk):
  
     # ── File pickers ───────────────────────────────────────────────────────────
     def _pick_audio_files(self):
+        """Open a multi-file dialog so the user can select individual audio files.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — updates self._selected_audio_paths and the summary label.
+        """
         filetypes = [
             ("Upload files", " ".join(f"*{ext}" for ext in AUDIO_EXTENSIONS)),
             ("All files", "*.*"),
@@ -222,6 +263,17 @@ class App(ctk.CTk):
             self._update_audio_summary()
  
     def _pick_audio_folder(self):
+        """Open a directory dialog and recursively collect all audio files inside.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — updates self._selected_audio_paths and the summary label.
+             Shows a warning dialog if no supported audio files are found.
+        """
         folder = filedialog.askdirectory(title="Select folder containing audio files")
         if folder:
             found = _collect_audio_files([Path(folder)])
@@ -236,10 +288,30 @@ class App(ctk.CTk):
             self._update_audio_summary()
  
     def _clear_audio_selection(self):
+        """Clear the current audio file selection and reset the summary label.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — empties self._selected_audio_paths and resets the label text.
+        """
         self._selected_audio_paths = []
         self.audio_summary_label.configure(text="No files selected.")
  
     def _update_audio_summary(self):
+        """Update the audio selection summary label to reflect the current file list.
+
+        Inputs
+        ------
+        None — reads self._selected_audio_paths.
+
+        Outputs
+        -------
+        None — updates self.audio_summary_label text.
+        """
         n = len(self._selected_audio_paths)
         if n == 0:
             self.audio_summary_label.configure(text="No files selected.")
@@ -253,23 +325,66 @@ class App(ctk.CTk):
             )
  
     def _pick_output_dir(self):
+        """Open a directory dialog and set the output directory path field.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — updates self.out_dir_var with the chosen directory path.
+        """
         d = filedialog.askdirectory(title="Choose output folder")
         if d:
             self.out_dir_var.set(d)
  
     # ── Logging / status ───────────────────────────────────────────────────────
     def _log(self, msg):
-        """Safe to call from any thread via self.after(0, self._log, msg)."""
+        """Append a message to the log box.  Safe to call from any thread via self.after(0, ...).
+
+        Inputs
+        ------
+        msg : str
+            Text to append; a newline is added automatically.
+
+        Outputs
+        -------
+        None — appends to the log box widget.
+        """
         self.log_box.configure(state="normal")
         self.log_box.insert("end", str(msg) + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
  
     def _set_status(self, msg: str, progress: float):
+        """Update the status label text and progress bar value.
+
+        Inputs
+        ------
+        msg : str
+            Human-readable status message to display.
+        progress : float
+            Progress bar value in [0.0, 1.0].
+
+        Outputs
+        -------
+        None — mutates status_label and progress bar widgets.
+        """
         self.status_label.configure(text=msg)
         self.progress.set(progress)
  
     def _open_output_folder(self):
+        """Open self._result_dir in the OS file explorer (cross-platform).
+
+        Inputs
+        ------
+        None — reads self._result_dir.
+
+        Outputs
+        -------
+        None — launches the OS file manager as a subprocess.
+        """
         if self._result_dir and Path(self._result_dir).exists():
             import subprocess, platform
             if platform.system() == "Darwin":
@@ -281,7 +396,16 @@ class App(ctk.CTk):
  
     # ── Retry ──────────────────────────────────────────────────────────────────
     def _retry(self):
-        """Hide retry button, clear the log, reset progress, and run again."""
+        """Hide the retry button, clear the log, reset progress to 0, and restart the pipeline.
+
+        Inputs
+        ------
+        None.
+
+        Outputs
+        -------
+        None — resets UI state and calls self._start_pipeline().
+        """
         self.retry_btn.pack_forget()
         self.log_box.configure(state="normal")
         self.log_box.delete("1.0", "end")
@@ -291,7 +415,21 @@ class App(ctk.CTk):
         self._start_pipeline()
  
     def _show_error(self, short_msg: str, full_trace: str):
-        """Called on the main thread when the pipeline fails."""
+        """Display an error in the status label and log box, then re-enable the retry button.
+
+        Must be called on the main thread (use self.after(0, self._show_error, ...)).
+
+        Inputs
+        ------
+        short_msg : str
+            One-line summary for the status bar.
+        full_trace : str
+            Full traceback string printed to the log box.
+
+        Outputs
+        -------
+        None — updates status label, log box, and button states.
+        """
         self._set_status(f" {short_msg}", 0)
         self._log(f"\n {short_msg}\n{full_trace}")
         # Re-enable run button and show retry button
@@ -301,6 +439,18 @@ class App(ctk.CTk):
  
     # ── Validation + dispatch ──────────────────────────────────────────────────
     def _start_pipeline(self):
+        """Validate all user inputs and launch the pipeline on a background thread.
+
+        Inputs
+        ------
+        None — reads widget state (active tab, URL entry, selected audio paths,
+               output directory, district name).
+
+        Outputs
+        -------
+        None — disables the run button and starts a daemon thread running
+               self._run_pipeline.  Shows warning dialogs on missing inputs.
+        """
         active_tab = self.tab_view.get()
  
         if active_tab == "Website URL":
@@ -348,6 +498,29 @@ class App(ctk.CTk):
 
 
     def _run_pipeline(self, url: str | None, audio_paths, out_dir: Path, district: str):
+        """Execute the four-step pipeline on a background thread.
+
+        Steps:
+            1. Download audio (URL mode) or accept local files (upload mode).
+            2. Transcribe each audio file with Parakeet ASR.
+            3. Chunk each transcript into 2-minute windows.
+            4. Run the LR model on each chunks CSV and save a highlighted .docx.
+
+        Inputs
+        ------
+        url : str or None
+            Swagit URL to scrape and download.  None when using local files.
+        audio_paths : list of Path or None
+            Local audio files to process.  None when using a URL.
+        out_dir : Path
+            Directory where the final .docx report(s) are written.
+        district : str
+            Human-readable district name embedded in the output report.
+
+        Outputs
+        -------
+        None — updates GUI via self.after() callbacks on success or failure.
+        """
         try:
             with tempfile.TemporaryDirectory(prefix="transcript_") as tmp:
                 tmp_path = Path(tmp)
