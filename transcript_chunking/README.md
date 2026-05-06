@@ -1,6 +1,6 @@
 # Transcript Chunking - Split Transcripts into Time-Window Chunks
 
-Splits timestamped transcripts into fixed-duration chunks for labeling and classification. Designed to process the `[MM:SS-MM:SS]` section headers produced by the transcription step.
+Splits timestamped transcripts into fixed-duration chunks for labeling and classification. Designed to process the `[MM:SS–MM:SS]` section headers produced by the transcription step.
 
 ## Setup
 
@@ -28,13 +28,13 @@ python create_chunks.py --input transcript.txt --output chunks.csv --chunk-minut
 
 ## Input Format
 
-The input transcript must contain `[MM:SS-MM:SS]` or `[HH:MM:SS-HH:MM:SS]` section headers, as produced by the transcription step:
+The input transcript must contain `[MM:SS–MM:SS]` or `[HH:MM:SS–HH:MM:SS]` section headers, as produced by the transcription step:
 
 ```
-[00:00-00:30]
+[00:00–00:30]
 Good evening everyone. Welcome to the regular meeting of the board of trustees.
 
-[00:30-01:00]
+[00:30–01:00]
 First item on the agenda is the approval of the minutes from our last meeting.
 ```
 

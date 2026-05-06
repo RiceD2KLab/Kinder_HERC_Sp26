@@ -54,7 +54,7 @@ Each CSV in `Transcript Data/` represents one school board meeting. The pipeline
 | `text` | str | Raw transcribed text for this chunk |
 | `binary_hit` | int | `1` = research/data mention, `0` = not |
 
-The dataset covers 25 meetings across Houston ISD, Katy ISD, and Spring Branch ISD.
+The dataset covers 49 meetings across Houston ISD, Katy ISD, and Spring Branch ISD.
 
 ## Pipeline Steps
 
@@ -298,7 +298,7 @@ These scripts visualize the embedding space and model performance. They import f
 
 #### `plot_embeddings_extended.py` — t-SNE + cluster analysis
 
-Computes t-SNE on all chunk embeddings and produces three plots plus a cluster CSV.
+Computes t-SNE on all chunk embeddings and produces five plots plus a cluster CSV.
 
 ```bash
 cd research_chunk_pipeline/results_visualization_scripts
@@ -315,9 +315,11 @@ python plot_embeddings_extended.py --transcript-data-dir "../../Transcript Data"
 
 | File | Description |
 |------|-------------|
-| `full_dataset_tsne.png` | t-SNE with binary labels (red = negative, green = positive) |
+| `full_dataset_tsne.png` | t-SNE with binary labels (positive vs. negative) |
 | `tsne_by_district.png` | t-SNE colored by school district; positives as stars |
-| `tsne_positive_neighborhoods.png` | Positive chunks only, colored by HDBSCAN cluster |
+| `tsne_positive_neighborhoods.png` | Positive chunks only, colored by HDBSCAN cluster (A–Q) |
+| `tsne_neighborhoods_with_negatives.png` | Neighborhood ellipses overlaid on the full dataset |
+| `tsne_neighborhoods_by_transcript.png` | Positive chunks colored by source transcript |
 | `positive_neighborhoods.csv` | One row per positive: cluster label, t-SNE coordinates, text preview |
 
 #### `plot_pr_curve.py` — precision-recall curve
@@ -349,7 +351,7 @@ Plots t-SNE for each CV fold, showing how train/test transcripts are distributed
 
 All chunks from a single meeting are always assigned to the same split. Chunks from the same meeting are highly correlated (same speakers, same agenda items, sometimes the same sentence spanning adjacent chunks), so mixing them across train/val/test would leak information and inflate metrics.
 
-With 25 transcripts at 60/20/20 the default split gives 15 train / 5 val / 5 test transcripts.
+With 49 transcripts at 60/20/20 the default split gives approximately 29 train / 10 val / 10 test transcripts.
 
 ### Class-imbalance handling
 

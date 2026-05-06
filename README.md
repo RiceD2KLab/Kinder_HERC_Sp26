@@ -254,7 +254,7 @@ Labeled transcript CSVs are stored in `research_labeling/Transcript Data/`. Each
 | `text` | Raw transcribed text for this chunk |
 | `binary_hit` | `1` = research/data mention, `0` = not |
 
-The dataset covers 25 meetings across Houston ISD, Katy ISD, and Spring Branch ISD.
+The dataset covers 49 meetings across Houston ISD, Katy ISD, and Spring Branch ISD.
 
 Audio/video files are not included in the repository due to size. To obtain them, run the web scraping module (Step 1 above) with the appropriate district URLs from their Swagit pages.
 
