@@ -19,7 +19,7 @@ joblib==1.5.3
 hdbscan==0.8.42
 
 # Word Error Rate
-jiwer==4.0.0
+jiwer==3.1.0
 contractions==0.1.73
 num2words==0.5.14
 
@@ -27,3 +27,8 @@ num2words==0.5.14
 customtkinter==5.2.2
 imageio-ffmpeg==0.5.1
 python-docx==1.2.0
+
+# Notebook
+jupyter==1.1.1
+notebook==7.3.3
+ipykernel==6.29.5
