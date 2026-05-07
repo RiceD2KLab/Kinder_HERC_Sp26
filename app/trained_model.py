@@ -71,6 +71,8 @@ def run_predictions(
     arts = _load_artifacts(artifacts_path)
 
     model           = arts["model"]
+    if not hasattr(model, "multi_class"):
+        model.multi_class = "deprecated"
     threshold       = arts["threshold"]
     feature_mode    = arts["feature_mode"]
     embedding_model = arts["embedding_model"]
